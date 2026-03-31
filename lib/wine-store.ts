@@ -18,6 +18,13 @@ type EnrichmentOptions = {
   deepCriticLookup?: boolean;
 };
 
+export class ExternalScoringUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ExternalScoringUnavailableError";
+  }
+}
+
 const execFileAsync = promisify(execFile);
 function inferReadinessFromOptionalVintage(vintage: number | null) {
   return vintage ? inferReadinessFromVintage(vintage) : "Ready";
@@ -468,7 +475,9 @@ async function fetchVivinoBrowserData(url: string) {
   const data = await fetchRenderedPage(url);
 
   if (!data) {
-    throw new Error("No supported rendered-page provider is configured for Vivino enrichment.");
+    throw new ExternalScoringUnavailableError(
+      "Vivino online enrichment requires a rendered-browser provider. Add BROWSERLESS_API_TOKEN in Vercel and redeploy."
+    );
   }
 
   return data;

@@ -451,6 +451,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
           if (enrichResponse.ok) {
             await loadWines();
+            return;
+          }
+
+          const enrichPayload = await readResponsePayload<{ error?: string }>(enrichResponse);
+          if (enrichPayload.error) {
+            setError(enrichPayload.error);
           }
         })();
       }
@@ -506,7 +512,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       });
 
       if (!response.ok) {
-        setError("Unable to refresh Vivino data for this wine.");
+        const payload = await readResponsePayload<{ error?: string }>(response);
+        setError(payload.error ?? "Unable to refresh external scores for this wine.");
         return;
       }
 
