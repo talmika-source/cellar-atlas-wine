@@ -78,8 +78,8 @@ export function StorageLocationsPanel() {
       fetch("/api/locations", { cache: "no-store" })
     ]);
 
-    const winePayload = (await wineResponse.json()) as { data?: WineBottle[] };
-    const locationPayload = (await locationResponse.json()) as { data?: StorageLocation[] };
+    const winePayload = (wineResponse.ok ? await readResponsePayload(wineResponse) : {}) as { data?: WineBottle[] };
+    const locationPayload = (locationResponse.ok ? await readResponsePayload(locationResponse) : {}) as { data?: StorageLocation[] };
     setWines(winePayload.data ?? []);
     setLocations(locationPayload.data ?? []);
   };

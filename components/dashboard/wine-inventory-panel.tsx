@@ -237,13 +237,13 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
-    const payload = (await response.json()) as { data?: WineBottle[] };
+    const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
     setWines(payload.data ?? []);
   };
 
   const loadLocations = async () => {
     const response = await fetch("/api/locations", { cache: "no-store" });
-    const payload = (await response.json()) as { data?: StorageLocation[] };
+    const payload = response.ok ? await readResponsePayload<{ data?: StorageLocation[] }>(response) : {};
     const nextLocations = payload.data ?? [];
     setLocations(nextLocations);
 

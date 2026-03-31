@@ -66,10 +66,24 @@ export function ProducerDirectory() {
     setAboveFourOnly(false);
   };
 
+  const readResponsePayload = async <T,>(response: Response) => {
+    const text = await response.text();
+
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return {} as T;
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       const response = await fetch("/api/wines", { cache: "no-store" });
-      const payload = (await response.json()) as { data?: WineBottle[] };
+      const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
       setWines(payload.data ?? []);
     };
 

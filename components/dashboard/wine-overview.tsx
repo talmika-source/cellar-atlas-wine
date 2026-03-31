@@ -14,6 +14,20 @@ export function WineOverview() {
   const [wines, setWines] = useState<WineBottle[]>([]);
   const [locations, setLocations] = useState<StorageLocation[]>([]);
 
+  const readResponsePayload = async <T,>(response: Response) => {
+    const text = await response.text();
+
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return {} as T;
+    }
+  };
+
   useEffect(() => {
     const load = async () => {
       const [wineResponse, locationResponse] = await Promise.all([
@@ -21,8 +35,8 @@ export function WineOverview() {
         fetch("/api/locations", { cache: "no-store" })
       ]);
 
-      const winePayload = (await wineResponse.json()) as { data?: WineBottle[] };
-      const locationPayload = (await locationResponse.json()) as { data?: StorageLocation[] };
+      const winePayload = wineResponse.ok ? await readResponsePayload<{ data?: WineBottle[] }>(wineResponse) : {};
+      const locationPayload = locationResponse.ok ? await readResponsePayload<{ data?: StorageLocation[] }>(locationResponse) : {};
       setWines(winePayload.data ?? []);
       setLocations(locationPayload.data ?? []);
     };
