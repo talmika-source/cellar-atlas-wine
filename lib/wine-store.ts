@@ -1,10 +1,9 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
 import { promisify } from "node:util";
 
 import { prisma } from "@/lib/db/prisma";
 import { enrichWineWithCriticScores } from "@/lib/critic-sources";
+import { fetchRenderedPage } from "@/lib/rendered-page";
 import { readStoredWines, writeStoredWines } from "@/lib/wine-file-store";
 import { getDefaultLocationId } from "@/lib/locations-store";
 import { mapReadinessToDb, mapWineRecord } from "@/lib/wine-persistence";
@@ -20,13 +19,6 @@ type EnrichmentOptions = {
 };
 
 const execFileAsync = promisify(execFile);
-const browserCandidates = [
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-];
-
 function inferReadinessFromOptionalVintage(vintage: number | null) {
   return vintage ? inferReadinessFromVintage(vintage) : "Ready";
 }
@@ -473,25 +465,13 @@ function buildCanonicalVivinoWineUrl(url: string) {
 }
 
 async function fetchVivinoBrowserData(url: string) {
-  const browserPath = browserCandidates.find((candidate) => existsSync(candidate));
+  const data = await fetchRenderedPage(url);
 
-  if (!browserPath) {
-    throw new Error("No supported browser is installed for Vivino enrichment.");
+  if (!data) {
+    throw new Error("No supported rendered-page provider is configured for Vivino enrichment.");
   }
 
-  const scriptPath = path.join(process.cwd(), "scripts", "fetch-vivino-browser-data.cjs");
-  const { stdout } = await execFileAsync(process.execPath, [scriptPath, url, browserPath], {
-    timeout: 90000,
-    maxBuffer: 16 * 1024 * 1024
-  });
-
-  return JSON.parse(stdout) as {
-    finalUrl: string;
-    html: string;
-    title: string;
-    scoreTexts: string[];
-    bodyText: string;
-  };
+  return data;
 }
 
 function extractVivinoScoreFromBrowserData(data: { html: string; title: string; scoreTexts: string[]; bodyText: string }) {

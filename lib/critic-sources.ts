@@ -1,9 +1,5 @@
-import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
-import path from "node:path";
-import { promisify } from "node:util";
-
 import { type WineInput } from "@/lib/wine-store";
+import { fetchRenderedPage } from "@/lib/rendered-page";
 
 export type CriticScores = {
   robertParkerScore?: number | null;
@@ -41,15 +37,6 @@ const candidateSources: CandidateSource[] = [
     apiKey: process.env.GLOBAL_WINE_SCORE_API_KEY
   }
 ];
-
-const browserCandidates = [
-  "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
-  "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-  "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
-];
-
-const execFileAsync = promisify(execFile);
 
 function normalizeQueryValue(value: string | undefined) {
   return value?.trim().replace(/\s+/g, " ").replace(/[\s,;:/-]+$/g, "") ?? "";
@@ -369,40 +356,52 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
   };
 }
 
-async function fetchBrowserPage(url: string) {
-  const browserPath = browserCandidates.find((candidate) => existsSync(candidate));
-
-  if (!browserPath) {
-    return null;
-  }
-
-  const scriptPath = path.join(process.cwd(), "scripts", "fetch-browser-page.cjs");
-
-  try {
-    const { stdout } = await execFileAsync(process.execPath, [scriptPath, url, browserPath], {
-      timeout: 90000,
-      maxBuffer: 16 * 1024 * 1024
-    });
-
-    return JSON.parse(stdout) as {
-      finalUrl: string;
-      title: string;
-      html: string;
-      bodyText: string;
-    };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchWineSearcherBrowserScores(query: CriticLookupQuery) {
+async function fetchWineSearcherPageScores(query: CriticLookupQuery) {
   const url = buildWineSearcherUrl(query);
 
   if (!url) {
     return null;
   }
 
-  const page = await fetchBrowserPage(url);
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 CellarAtlas/1.0"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+    const combinedText = html.replace(/\s+/g, " ");
+    const robertParkerScore = parseCriticScoreFromText(combinedText, /(robert.?parker|wine advocate|parker|wa|rp)/i);
+    const jamesSucklingScore = parseCriticScoreFromText(combinedText, /(james.?suckling|suckling|js)/i);
+
+    if (!robertParkerScore && !jamesSucklingScore) {
+      return null;
+    }
+
+    return {
+      robertParkerScore,
+      jamesSucklingScore,
+      criticSource: "Wine-Searcher page"
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchWineSearcherRenderedScores(query: CriticLookupQuery) {
+  const url = buildWineSearcherUrl(query);
+
+  if (!url) {
+    return null;
+  }
+
+  const page = await fetchRenderedPage(url);
 
   if (!page) {
     return null;
@@ -638,7 +637,7 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
     }
   }
 
-  if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
+  if (!robertParkerScore || !jamesSucklingScore) {
     for (const query of lookupQueries) {
       if (robertParkerScore > 0 && jamesSucklingScore > 0) {
         break;
@@ -665,7 +664,28 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
         break;
       }
 
-      const result = await fetchWineSearcherBrowserScores(query);
+      const result = await fetchWineSearcherPageScores(query);
+
+      if (!result) {
+        continue;
+      }
+
+      robertParkerScore ||= result.robertParkerScore ?? 0;
+      jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
+
+      if (result.criticSource) {
+        sourcesUsed.push(result.criticSource);
+      }
+    }
+  }
+
+  if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
+    for (const query of lookupQueries) {
+      if (robertParkerScore > 0 && jamesSucklingScore > 0) {
+        break;
+      }
+
+      const result = await fetchWineSearcherRenderedScores(query);
 
       if (!result) {
         continue;

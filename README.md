@@ -31,6 +31,12 @@ Important hosting note:
 - That works on a VPS or traditional Node host with a writable filesystem.
 - It is not a reliable persistence model for Netlify or other serverless hosts, because filesystem writes are not durable there.
 
+Online scoring note:
+- For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
+- `DATABASE_URL` should point to your Postgres database.
+- `BROWSERLESS_API_TOKEN` lets the app render Vivino and Wine-Searcher pages online when plain fetches are blocked.
+- `WINE_SEARCHER_API_URL` + `WINE_SEARCHER_API_KEY` and `GLOBAL_WINE_SCORE_API_URL` + `GLOBAL_WINE_SCORE_API_KEY` are optional critic APIs that improve Robert Parker and James Suckling coverage.
+
 Best deployment targets right now:
 - Hostinger VPS
 - Any Node.js VPS with a writable disk
