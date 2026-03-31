@@ -215,11 +215,11 @@ async function fetchRenderedPageViaBrowserlessWebSocket(url: string) {
     return null;
   }
 
-  let browser: Awaited<ReturnType<typeof chromium.connect>> | null = null;
+  let browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | null = null;
 
   try {
-    browser = await chromium.connect(`${payload.browserWSEndpoint}?token=${encodeURIComponent(token)}`);
-    const context = await browser.newContext();
+    browser = await chromium.connectOverCDP(`${payload.browserWSEndpoint}?token=${encodeURIComponent(token)}`);
+    const context = browser.contexts()[0] ?? (await browser.newContext());
 
     if (payload.cookies?.length) {
       await context.addCookies(
