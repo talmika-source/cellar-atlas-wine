@@ -8,14 +8,21 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as Partial<LocationInput>;
-  const validated = validateLocationInput(body);
+  try {
+    const body = (await request.json()) as Partial<LocationInput>;
+    const validated = validateLocationInput(body);
 
-  if (!validated.success) {
-    return NextResponse.json({ error: validated.error }, { status: 400 });
+    if (!validated.success) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
+    }
+
+    const location = await createLocation(validated.data as ValidatedLocationInput);
+
+    return NextResponse.json({ data: location }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to create location." },
+      { status: 500 }
+    );
   }
-
-  const location = await createLocation(validated.data as ValidatedLocationInput);
-
-  return NextResponse.json({ data: location }, { status: 201 });
 }

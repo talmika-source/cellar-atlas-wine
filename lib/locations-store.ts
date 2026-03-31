@@ -72,15 +72,19 @@ export async function createLocation(input: LocationInput) {
 
     return mapLocationRecord(record);
   } catch {
-    const locations = await readStoredLocations();
-    const location: LocationRecord = {
-      ...input,
-      id: `loc-${Date.now()}`,
-      occupied: 0
-    };
-    locations.unshift(location);
-    await writeStoredLocations(locations);
-    return location;
+    try {
+      const locations = await readStoredLocations();
+      const location: LocationRecord = {
+        ...input,
+        id: `loc-${Date.now()}`,
+        occupied: 0
+      };
+      locations.unshift(location);
+      await writeStoredLocations(locations);
+      return location;
+    } catch {
+      throw new Error("Location storage is unavailable. On Vercel, connect a working Postgres database and run the Prisma schema setup.");
+    }
   }
 }
 
@@ -116,20 +120,24 @@ export async function updateLocation(id: string, patch: Partial<LocationInput>) 
 
     return mapLocationRecord(record);
   } catch {
-    const locations = await readStoredLocations();
-    const index = locations.findIndex((location) => location.id === id);
+    try {
+      const locations = await readStoredLocations();
+      const index = locations.findIndex((location) => location.id === id);
 
-    if (index === -1) {
-      return null;
+      if (index === -1) {
+        return null;
+      }
+
+      locations[index] = {
+        ...locations[index],
+        ...patch
+      };
+
+      await writeStoredLocations(locations);
+      return (await listLocations()).find((location: LocationRecord) => location.id === id) ?? null;
+    } catch {
+      throw new Error("Location storage is unavailable. On Vercel, connect a working Postgres database and run the Prisma schema setup.");
     }
-
-    locations[index] = {
-      ...locations[index],
-      ...patch
-    };
-
-    await writeStoredLocations(locations);
-    return (await listLocations()).find((location: LocationRecord) => location.id === id) ?? null;
   }
 }
 
@@ -149,15 +157,19 @@ export async function deleteLocation(id: string) {
 
     return true;
   } catch {
-    const locations = await readStoredLocations();
-    const nextLocations = locations.filter((location) => location.id !== id);
+    try {
+      const locations = await readStoredLocations();
+      const nextLocations = locations.filter((location) => location.id !== id);
 
-    if (nextLocations.length === locations.length) {
-      return false;
+      if (nextLocations.length === locations.length) {
+        return false;
+      }
+
+      await writeStoredLocations(nextLocations);
+      return true;
+    } catch {
+      throw new Error("Location storage is unavailable. On Vercel, connect a working Postgres database and run the Prisma schema setup.");
     }
-
-    await writeStoredLocations(nextLocations);
-    return true;
   }
 }
 

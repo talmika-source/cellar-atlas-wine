@@ -58,6 +58,20 @@ export function StorageLocationsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  const readResponsePayload = async (response: Response) => {
+    const text = await response.text();
+
+    if (!text) {
+      return {};
+    }
+
+    try {
+      return JSON.parse(text) as { error?: string };
+    } catch {
+      return { error: "The server returned an invalid response." };
+    }
+  };
+
   const load = async () => {
     const [wineResponse, locationResponse] = await Promise.all([
       fetch("/api/wines", { cache: "no-store" }),
@@ -119,7 +133,7 @@ export function StorageLocationsPanel() {
         })
       });
 
-      const payload = (await response.json()) as { error?: string };
+      const payload = await readResponsePayload(response);
 
       if (!response.ok) {
         setError(payload.error ?? "Unable to save location.");
@@ -142,7 +156,7 @@ export function StorageLocationsPanel() {
 
     startTransition(async () => {
       const response = await fetch(`/api/locations/${location.id}`, { method: "DELETE" });
-      const payload = (await response.json()) as { error?: string };
+      const payload = await readResponsePayload(response);
 
       if (!response.ok) {
         setError(payload.error ?? "Unable to delete location.");

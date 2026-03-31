@@ -221,6 +221,20 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [isPending, startTransition] = useTransition();
   const normalizedQuery = query.trim().toLowerCase();
 
+  const readResponsePayload = async <T,>(response: Response) => {
+    const text = await response.text();
+
+    if (!text) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      return { error: "The server returned an invalid response." } as T;
+    }
+  };
+
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
     const payload = (await response.json()) as { data?: WineBottle[] };
@@ -417,11 +431,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       });
 
       if (!response.ok) {
-        setError("Unable to save this wine.");
+        const payload = await readResponsePayload<{ error?: string }>(response);
+        setError(payload.error ?? "Unable to save this wine.");
         return;
       }
 
-      const payload = (await response.json()) as { data?: WineBottle };
+      const payload = await readResponsePayload<{ data?: WineBottle }>(response);
       const savedWine = payload.data;
 
       await Promise.all([loadWines(), loadLocations()]);
