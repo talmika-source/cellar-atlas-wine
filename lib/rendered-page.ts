@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
 
 const execFileAsync = promisify(execFile);
 const browserCandidates = [
@@ -166,6 +167,102 @@ async function fetchRenderedPageViaBrowserlessUnblock(url: string) {
   } satisfies RenderedPageData;
 }
 
+async function fetchRenderedPageViaBrowserlessWebSocket(url: string) {
+  const token = process.env.BROWSERLESS_API_TOKEN?.trim();
+
+  if (!token) {
+    return null;
+  }
+
+  const baseUrl = buildBrowserlessBaseUrl();
+  const query = buildBrowserlessQuery();
+  const endpoint = `${baseUrl}/unblock?${query.toString()}`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "Mozilla/5.0 CellarAtlas/1.0"
+    },
+    body: JSON.stringify({
+      url,
+      browserWSEndpoint: true,
+      cookies: true,
+      ttl: 30000
+    }),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as {
+    browserWSEndpoint?: string | null;
+    cookies?: Array<{
+      name: string;
+      value: string;
+      domain?: string;
+      path?: string;
+      expires?: number;
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: "Strict" | "Lax" | "None";
+    }>;
+  };
+
+  if (!payload.browserWSEndpoint) {
+    return null;
+  }
+
+  let browser: Awaited<ReturnType<typeof chromium.connect>> | null = null;
+
+  try {
+    browser = await chromium.connect(`${payload.browserWSEndpoint}?token=${encodeURIComponent(token)}`);
+    const context = await browser.newContext();
+
+    if (payload.cookies?.length) {
+      await context.addCookies(
+        payload.cookies.map((cookie) => ({
+          name: cookie.name,
+          value: cookie.value,
+          domain: cookie.domain ?? new URL(url).hostname,
+          path: cookie.path ?? "/",
+          expires: cookie.expires ?? -1,
+          httpOnly: cookie.httpOnly ?? false,
+          secure: cookie.secure ?? true,
+          sameSite: cookie.sameSite ?? "Lax"
+        }))
+      );
+    }
+
+    const page = await context.newPage();
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 45000
+    });
+    await page.waitForTimeout(3000);
+
+    const html = await page.content();
+    const bodyText = (await page.locator("body").innerText().catch(() => "")) || "";
+    const title = await page.title().catch(() => parseTitle(html));
+
+    return {
+      finalUrl: page.url(),
+      title,
+      html,
+      bodyText,
+      scoreTexts: extractScoreTexts(bodyText)
+    } satisfies RenderedPageData;
+  } catch {
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => undefined);
+    }
+  }
+}
+
 async function fetchRenderedPageViaLocalBrowser(url: string) {
   const browserPath = browserCandidates.find((candidate) => existsSync(candidate));
 
@@ -208,6 +305,12 @@ export async function fetchRenderedPage(url: string) {
 
     if (unblockResult) {
       return unblockResult;
+    }
+
+    const wsResult = await fetchRenderedPageViaBrowserlessWebSocket(url);
+
+    if (wsResult) {
+      return wsResult;
     }
 
     if (browserlessResult) {
