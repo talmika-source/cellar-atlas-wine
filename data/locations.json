@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Closet",
+    "type": "Cabinet",
+    "room": "Closet",
+    "capacity": 100,
+    "temperatureC": 25,
+    "humidity": 65,
+    "notes": "Keeping Mika Wines",
+    "id": "loc-1774977599733",
+    "occupied": 0
+  },
+  {
+    "name": "Kitchen Closet",
+    "type": "Cabinet",
+    "room": "Kitchen",
+    "capacity": 20,
+    "temperatureC": 25,
+    "humidity": 65,
+    "notes": "",
+    "id": "loc-1774977564985",
+    "occupied": 0
+  },
+  {
+    "name": "Rocket Launcher",
+    "type": "Cabinet",
+    "room": "Living Room",
+    "capacity": 3,
+    "temperatureC": 25,
+    "humidity": 65,
+    "notes": "",
+    "id": "loc-1774977533285",
+    "occupied": 0
+  },
+  {
+    "name": "Suitcase",
+    "type": "Cabinet",
+    "room": "Living Room",
+    "capacity": 6,
+    "temperatureC": 25,
+    "humidity": 65,
+    "notes": "",
+    "id": "loc-1774977491687",
+    "occupied": 0
+  },
+  {
+    "name": "Wall Mount",
+    "type": "Cabinet",
+    "room": "Living Room",
+    "capacity": 8,
+    "temperatureC": 25,
+    "humidity": 65,
+    "notes": "",
+    "id": "loc-1774977467408",
+    "occupied": 0
+  },
+  {
+    "name": "Living Room Fridge",
+    "type": "Fridge",
+    "room": "Living Room",
+    "capacity": 24,
+    "temperatureC": 16,
+    "humidity": 65,
+    "notes": "",
+    "id": "loc-1774977432981",
+    "occupied": 0
+  },
+  {
+    "name": "Niche Fridge",
+    "type": "Fridge",
+    "room": "Living Room",
+    "capacity": 51,
+    "temperatureC": 16,
+    "humidity": 65,
+    "notes": "Keeping Best wines",
+    "id": "loc-1774977405537",
+    "occupied": 0
+  }
+]

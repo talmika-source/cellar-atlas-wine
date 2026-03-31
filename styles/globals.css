@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 24 38% 97%;
+  --foreground: 346 25% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 346 25% 16%;
+  --border: 28 22% 84%;
+  --input: 28 22% 84%;
+  --primary: 348 57% 31%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 35 45% 94%;
+  --secondary-foreground: 346 25% 16%;
+  --muted: 35 38% 94%;
+  --muted-foreground: 18 15% 40%;
+  --accent: 50 55% 88%;
+  --accent-foreground: 31 65% 24%;
+  --ring: 348 57% 31%;
+  --success: 148 55% 30%;
+  --warning: 30 88% 42%;
+  --danger: 0 84% 55%;
+  --font-sans: "Aptos", "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+}
+
+.dark {
+  --background: 220 29% 10%;
+  --foreground: 210 40% 98%;
+  --card: 222 30% 14%;
+  --card-foreground: 210 40% 98%;
+  --border: 218 18% 24%;
+  --input: 218 18% 24%;
+  --primary: 192 91% 47%;
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 26% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 26% 17%;
+  --muted-foreground: 214 20% 70%;
+  --accent: 188 40% 18%;
+  --accent-foreground: 180 80% 88%;
+  --ring: 192 91% 47%;
+  --success: 160 84% 42%;
+  --warning: 38 92% 56%;
+  --danger: 0 84% 65%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(127, 29, 29, 0.12), transparent 24rem),
+    radial-gradient(circle at top right, rgba(180, 83, 9, 0.1), transparent 26rem),
+    linear-gradient(180deg, rgba(255, 251, 245, 0.95), rgba(247, 241, 235, 0.8));
+  font-family: var(--font-sans);
+  min-height: 100vh;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(circle at top left, rgba(34, 211, 238, 0.08), transparent 22rem),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 28rem),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.8), rgba(2, 6, 23, 1));
+}

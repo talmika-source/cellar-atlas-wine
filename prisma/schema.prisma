@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobStatus {
+  NEW
+  RESEARCHING
+  OUTREACH
+  INTERVIEW
+  CLOSED
+}
+
+enum AssetType {
+  CRYPTO
+  STOCK
+  FX
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum TaskStatus {
+  TODO
+  DOING
+  DONE
+}
+
+enum StorageLocationType {
+  FRIDGE
+  CELLAR
+  CABINET
+  LOCKER
+}
+
+enum WineReadiness {
+  HOLD
+  READY
+  PEAK
+}
+
+model Company {
+  id             String           @id @default(cuid())
+  name           String
+  domain         String?          @unique
+  industry       String?
+  location       String?
+  description    String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  jobs           JobOpportunity[]
+  contacts       Contact[]
+  newsItems      NewsItem[]
+  meetingBriefs  MeetingBrief[]
+  linkedTasks    Task[]           @relation("LinkedCompanyTasks")
+}
+
+model JobOpportunity {
+  id          String    @id @default(cuid())
+  title       String
+  companyId   String
+  location    String?
+  status      JobStatus @default(NEW)
+  salaryRange String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Contact {
+  id          String    @id @default(cuid())
+  name        String
+  role        String?
+  companyId   String
+  email       String?   @unique
+  linkedin    String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  linkedTasks Task[]    @relation("LinkedContactTasks")
+}
+
+model Asset {
+  id        String    @id @default(cuid())
+  symbol    String
+  type      AssetType
+  price     Decimal   @db.Decimal(18, 4)
+  change24h Decimal   @db.Decimal(8, 2)
+  updatedAt DateTime  @updatedAt
+}
+
+model NewsItem {
+  id          String    @id @default(cuid())
+  title       String
+  source      String
+  url         String
+  companyId   String?
+  publishedAt DateTime
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+}
+
+model MeetingBrief {
+  id          String   @id @default(cuid())
+  companyId   String
+  summary     String
+  keyPoints   Json
+  generatedAt DateTime @default(now())
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id              String       @id @default(cuid())
+  title           String
+  description     String?
+  priority        TaskPriority @default(MEDIUM)
+  dueDate         DateTime?
+  status          TaskStatus   @default(TODO)
+  linkedCompanyId String?
+  linkedContactId String?
+  createdAt       DateTime     @default(now())
+  linkedCompany   Company?     @relation("LinkedCompanyTasks", fields: [linkedCompanyId], references: [id], onDelete: SetNull)
+  linkedContact   Contact?     @relation("LinkedContactTasks", fields: [linkedContactId], references: [id], onDelete: SetNull)
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  type      String
+  threshold String
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model WineLocation {
+  id           String              @id @default(cuid())
+  name         String
+  type         StorageLocationType
+  room         String?
+  capacity     Int                 @default(0)
+  temperatureC Float               @default(12)
+  humidity     Float               @default(65)
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  wines        WineEntry[]
+}
+
+model WineEntry {
+  id                 String         @id @default(cuid())
+  wineName           String
+  producer           String
+  imageUrl           String?
+  vintage            Int?
+  region             String?
+  country            String?
+  grape              String?
+  style              String?
+  bottleSize         String         @default("750ml")
+  quantity           Int            @default(1)
+  purchasePrice      Float          @default(0)
+  estimatedValue     Float          @default(0)
+  vivinoLink         String?
+  vivinoScore        Float          @default(0)
+  robertParkerScore  Float          @default(0)
+  jamesSucklingScore Float          @default(0)
+  criticSource       String?
+  locationId         String
+  shelf              String?
+  slot               String?
+  readiness          WineReadiness  @default(READY)
+  drinkWindow        String?
+  acquiredOn         DateTime?
+  supplierId         String?
+  notes              String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  location           WineLocation   @relation(fields: [locationId], references: [id], onDelete: Restrict)
+
+  @@index([locationId])
+}

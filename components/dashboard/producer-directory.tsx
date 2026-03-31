@@ -1,0 +1,269 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { NativeSelect } from "@/components/ui/native-select";
+import { getWineDisplayName } from "@/lib/wine-display";
+import { formatCurrency } from "@/lib/utils";
+import { isCellarWine, type WineBottle } from "@/lib/wine-data";
+
+function toggleFilterValue(current: string[], value: string, checked: boolean) {
+  if (checked) {
+    return current.includes(value) ? current : [...current, value];
+  }
+
+  return current.filter((item) => item !== value);
+}
+
+function FilterSelect({
+  label,
+  values,
+  options,
+  onChange
+}: {
+  label: string;
+  values: string[];
+  options: string[];
+  onChange: (values: string[]) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{label}</p>
+      <NativeSelect
+        multiple
+        size={Math.min(Math.max(options.length, 3), 6)}
+        value={values}
+        className="h-auto min-h-32 py-3"
+        onChange={(event) => onChange(Array.from(event.target.selectedOptions, (option) => option.value))}
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </NativeSelect>
+      <p className="text-xs text-muted-foreground">
+        {values.length > 0 ? `${values.length} selected` : "No filter selected"}
+      </p>
+    </div>
+  );
+}
+
+export function ProducerDirectory() {
+  const [wines, setWines] = useState<WineBottle[]>([]);
+  const [producerFilter, setProducerFilter] = useState<string[]>([]);
+  const [vintageFilter, setVintageFilter] = useState<string[]>([]);
+  const [regionFilter, setRegionFilter] = useState<string[]>([]);
+  const [countryFilter, setCountryFilter] = useState<string[]>([]);
+  const [aboveFourOnly, setAboveFourOnly] = useState(false);
+
+  const clearFilters = () => {
+    setProducerFilter([]);
+    setVintageFilter([]);
+    setRegionFilter([]);
+    setCountryFilter([]);
+    setAboveFourOnly(false);
+  };
+
+  useEffect(() => {
+    const load = async () => {
+      const response = await fetch("/api/wines", { cache: "no-store" });
+      const payload = (await response.json()) as { data?: WineBottle[] };
+      setWines(payload.data ?? []);
+    };
+
+    void load();
+  }, []);
+
+  const cellarWines = useMemo(() => wines.filter(isCellarWine), [wines]);
+
+  const producerOptions = useMemo(
+    () => [...new Set(cellarWines.map((wine) => wine.producer.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [cellarWines]
+  );
+
+  const vintageOptions = useMemo(
+    () =>
+      [...new Set(cellarWines.map((wine) => (wine.vintage ? String(wine.vintage) : "")).filter(Boolean))].sort((a, b) => Number(b) - Number(a)),
+    [cellarWines]
+  );
+
+  const regionOptions = useMemo(
+    () => [...new Set(cellarWines.map((wine) => wine.region.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [cellarWines]
+  );
+
+  const countryOptions = useMemo(
+    () => [...new Set(cellarWines.map((wine) => wine.country.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b)),
+    [cellarWines]
+  );
+
+  const filteredWines = useMemo(
+    () =>
+      cellarWines.filter((wine) => {
+        const matchesProducer = producerFilter.length === 0 || producerFilter.includes(wine.producer.trim());
+        const matchesVintage = vintageFilter.length === 0 || vintageFilter.includes(String(wine.vintage ?? ""));
+        const matchesRegion = regionFilter.length === 0 || regionFilter.includes(wine.region.trim());
+        const matchesCountry = countryFilter.length === 0 || countryFilter.includes(wine.country.trim());
+        const matchesScore = !aboveFourOnly || wine.vivinoScore > 4;
+
+        return matchesProducer && matchesVintage && matchesRegion && matchesCountry && matchesScore;
+      }),
+    [aboveFourOnly, cellarWines, countryFilter, producerFilter, regionFilter, vintageFilter]
+  );
+
+  const producerMap = useMemo(
+    () =>
+      Array.from(
+        filteredWines.reduce((map, wine) => {
+          const current = map.get(wine.producer) ?? {
+            producer: wine.producer,
+            regions: new Set<string>(),
+            bottles: 0,
+            averageScore: 0,
+            totalValue: 0,
+            wines: [] as WineBottle[]
+          };
+
+          current.regions.add(wine.region);
+          current.bottles += wine.quantity;
+          current.totalValue += wine.estimatedValue * wine.quantity;
+          current.wines.push(wine);
+          map.set(wine.producer, current);
+          return map;
+        }, new Map<string, {
+          producer: string;
+          regions: Set<string>;
+          bottles: number;
+          averageScore: number;
+          totalValue: number;
+          wines: WineBottle[];
+        }>())
+      ).map(([, value]) => ({
+        ...value,
+        regions: [...value.regions],
+        averageScore: value.wines.reduce((sum, wine) => sum + wine.vivinoScore, 0) / value.wines.length
+      })),
+    [filteredWines]
+  );
+
+  const merchants = useMemo(
+    () => [...new Set(filteredWines.map((wine) => wine.supplierId.trim()).filter(Boolean))].sort(),
+    [filteredWines]
+  );
+
+  return (
+    <div className="space-y-6">
+      <section className="space-y-2">
+        <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Producers</p>
+        <h2 className="text-3xl font-semibold tracking-tight">See where the cellar is concentrated by producer and style.</h2>
+      </section>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Producer filters</CardDescription>
+          <CardTitle>Filter by cellar data already in the app</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm font-medium text-primary transition hover:text-primary/80"
+            >
+              Clear filters
+            </button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <FilterSelect label="Producer" values={producerFilter} options={producerOptions} onChange={setProducerFilter} />
+            <FilterSelect label="Vintage" values={vintageFilter} options={vintageOptions} onChange={setVintageFilter} />
+            <FilterSelect label="Region" values={regionFilter} options={regionOptions} onChange={setRegionFilter} />
+            <FilterSelect label="Country" values={countryFilter} options={countryOptions} onChange={setCountryFilter} />
+          </div>
+          <label className="flex items-center gap-3 rounded-3xl border border-border/70 bg-background/70 px-4 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={aboveFourOnly}
+              onChange={(event) => setAboveFourOnly(event.target.checked)}
+              className="h-4 w-4 rounded border-input"
+            />
+            <span>Only show wines above 4.0 on Vivino</span>
+          </label>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{filteredWines.length} wines in filter view</span>
+            <span>•</span>
+            <span>{producerMap.length} producers visible</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        {producerMap
+          .sort((a, b) => b.totalValue - a.totalValue)
+          .map((producer) => (
+            <Card key={producer.producer}>
+              <CardHeader>
+                <CardDescription>{producer.regions.join(" • ")}</CardDescription>
+                <CardTitle>{producer.producer}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-3xl bg-secondary/60 p-4">
+                    <p className="text-sm text-muted-foreground">Bottles</p>
+                    <p className="mt-2 text-2xl font-semibold">{producer.bottles}</p>
+                  </div>
+                  <div className="rounded-3xl bg-secondary/60 p-4">
+                    <p className="text-sm text-muted-foreground">Avg score</p>
+                    <p className="mt-2 text-2xl font-semibold">{producer.averageScore.toFixed(2)}</p>
+                  </div>
+                  <div className="rounded-3xl bg-secondary/60 p-4">
+                    <p className="text-sm text-muted-foreground">Est. value</p>
+                    <p className="mt-2 text-2xl font-semibold">{formatCurrency(producer.totalValue)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  {producer.wines.map((wine) => (
+                    <div key={wine.id} className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {getWineDisplayName(wine.wineName, wine.vintage)}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {wine.vintage} • {wine.style} • {wine.grape} • Qty {wine.quantity}
+                          </p>
+                        </div>
+                        <span className="text-sm font-medium text-primary">{wine.vivinoScore.toFixed(1)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        {producerMap.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border/70 bg-background/50 p-6 text-sm text-muted-foreground">
+            No producers match the current filters.
+          </div>
+        ) : null}
+      </section>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Purchase Sources</CardDescription>
+          <CardTitle>Merchants linked to the current inventory</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          {merchants.map((merchant) => (
+            <div key={merchant} className="rounded-3xl border border-border/70 bg-background/70 p-4">
+              <p className="font-semibold">{merchant}</p>
+              <p className="mt-2 text-sm text-muted-foreground">Free-text purchase source captured from your inventory entries.</p>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
