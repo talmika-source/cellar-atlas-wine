@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
 import { getWineDisplayName } from "@/lib/wine-display";
+import { getPrimaryCellarScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type WineBottle } from "@/lib/wine-data";
 
@@ -157,7 +158,15 @@ export function ProducerDirectory() {
       ).map(([, value]) => ({
         ...value,
         regions: [...value.regions],
-        averageScore: value.wines.reduce((sum, wine) => sum + wine.vivinoScore, 0) / value.wines.length
+        averageScore:
+          value.wines
+            .map((wine) => getPrimaryCellarScore(wine))
+            .filter((score): score is number => score !== null)
+            .reduce((sum, score) => sum + score, 0) /
+            Math.max(
+              1,
+              value.wines.map((wine) => getPrimaryCellarScore(wine)).filter((score): score is number => score !== null).length
+            )
       })),
     [filteredWines]
   );
@@ -249,7 +258,7 @@ export function ProducerDirectory() {
                             {wine.vintage} • {wine.style} • {wine.grape} • Qty {wine.quantity}
                           </p>
                         </div>
-                        <span className="text-sm font-medium text-primary">{wine.vivinoScore.toFixed(1)}</span>
+                        <span className="text-sm font-medium text-primary">{(getPrimaryCellarScore(wine) ?? 0).toFixed(1)}</span>
                       </div>
                     </div>
                   ))}

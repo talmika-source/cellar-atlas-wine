@@ -654,12 +654,21 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: () => 
 }
 
 export async function enrichWineWithExternalScores(input: WineInput, options: EnrichmentOptions = {}) {
-  const withVivino = await enrichWineWithVivino(input);
-  return withTimeout(
-    enrichWineWithCriticScores(withVivino, { includeBrowserFallback: options.deepCriticLookup }),
-    options.deepCriticLookup ? 45000 : 5000,
-    () => withVivino
+  const withCritics = await withTimeout(
+    enrichWineWithCriticScores(input, { includeBrowserFallback: options.deepCriticLookup }),
+    options.deepCriticLookup ? 45000 : 12000,
+    () => input
   );
+
+  if (!withCritics.vivinoLink?.trim() && !input.vivinoLink?.trim()) {
+    return withCritics;
+  }
+
+  try {
+    return await enrichWineWithVivino(withCritics);
+  } catch {
+    return withCritics;
+  }
 }
 
 function extractVintage(text: string) {

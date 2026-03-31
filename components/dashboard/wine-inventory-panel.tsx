@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/utils";
 import { getWineDisplayTitle } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
+import { getPrimaryCellarScore, getPrimaryCellarScoreLabel } from "@/lib/wine-score";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 import { inferReadinessFromVintage } from "@/lib/wine-readiness";
 
@@ -303,10 +304,13 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
   const totalBottles = filteredCellarWines.reduce((sum, wine) => sum + wine.quantity, 0);
   const currentValue = filteredCellarWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
-  const averageScore =
-    filteredCellarWines.length > 0
-      ? filteredCellarWines.reduce((sum, wine) => sum + wine.vivinoScore, 0) / filteredCellarWines.length
-      : 0;
+  const scoredWines = filteredCellarWines
+    .map((wine) => getPrimaryCellarScore(wine))
+    .filter((score): score is number => score !== null);
+  const averageScore = scoredWines.length > 0 ? scoredWines.reduce((sum, score) => sum + score, 0) / scoredWines.length : 0;
+  const averageScoreLabel = filteredCellarWines.some((wine) => getPrimaryCellarScoreLabel(wine) === "Critics")
+    ? "Critic-first average across visible labels"
+    : "Vivino average across visible labels";
   const readyCount = filteredCellarWines.filter((wine) => wine.readiness !== "Hold").length;
 
   const updateForm = (key: keyof WineFormState, value: string) => {
@@ -559,7 +563,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     <div className="space-y-6">
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Inventory</p>
-        <h2 className="text-3xl font-semibold tracking-tight">Track every bottle by fridge, shelf, value, and Vivino context.</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Track every bottle by fridge, shelf, value, and critic context.</h2>
         <p className="max-w-3xl text-sm text-muted-foreground">
           Add bottles manually or use scan assist: paste OCR text from a bottle photo, review the suggested metadata, and save it into the right storage location.
         </p>
@@ -592,7 +596,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Filtered Bottles" value={String(totalBottles)} trend={`${filteredCellarWines.length} active wine entries in view`} />
         <KpiCard label="Inventory Value" value={formatCurrency(currentValue)} trend="Estimated current cellar value" tone="success" />
-        <KpiCard label="Average Vivino Score" value={averageScore.toFixed(2)} trend="Weighted by visible labels" tone="warning" />
+        <KpiCard label="Average Score" value={averageScore.toFixed(2)} trend={averageScoreLabel} tone="warning" />
         <KpiCard label="Ready Or Peak" value={String(readyCount)} trend="Bottles suitable for near-term service" tone="danger" />
       </section>
 
@@ -643,7 +647,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         <DialogContent className="max-h-[90vh] overflow-y-auto" side="right">
           <DialogHeader>
             <DialogTitle>{editingWine ? "Edit Wine" : "Add Wine"}</DialogTitle>
-            <DialogDescription>Save bottle details, shelf placement, pricing, and a direct Vivino wine page when we can resolve one.</DialogDescription>
+            <DialogDescription>Save bottle details, shelf placement, pricing, and optional external scoring links.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
@@ -730,7 +734,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               <Input placeholder="Critic source" value={form.criticSource} onChange={(event) => updateForm("criticSource", event.target.value)} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Auto-fill is best-effort only. Vivino uses browser enrichment, while Robert Parker and James Suckling can be filled manually or from configured Wine-Searcher / Global Wine Score API access.
+              Online scoring is critic-first. Robert Parker and James Suckling are prioritized from configured sources and Wine-Searcher parsing. Vivino remains an optional link and best-effort community score.
             </p>
             <div className="grid gap-3 md:grid-cols-2">
               <NativeSelect value={form.locationId} onChange={(event) => updateForm("locationId", event.target.value)}>
@@ -812,6 +816,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           const location = locations.find((item) => item.id === wine.locationId);
           const headerMeta = [wine.vintage ? String(wine.vintage) : "", wine.region, wine.country].filter(Boolean).join(" • ");
           const placement = formatWinePlacement(wine.shelf, wine.slot);
+          const primaryScore = getPrimaryCellarScore(wine);
+          const primaryScoreLabel = getPrimaryCellarScoreLabel(wine);
 
           return (
             <Card key={wine.id}>
@@ -822,9 +828,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                 </div>
                 <div className="flex items-center gap-2">
                   {isCellarWine(wine) ? <Badge variant={getReadinessVariant(wine.readiness)}>{wine.readiness}</Badge> : <Badge variant="info">Drank</Badge>}
-                  <Badge variant="info">{wine.vivinoScore.toFixed(1)} Vivino</Badge>
+                  {wine.vivinoScore > 0 ? <Badge variant="info">{wine.vivinoScore.toFixed(1)} Vivino</Badge> : null}
                   {wine.robertParkerScore > 0 ? <Badge variant="warning">RP {wine.robertParkerScore}</Badge> : null}
                   {wine.jamesSucklingScore > 0 ? <Badge variant="warning">JS {wine.jamesSucklingScore}</Badge> : null}
+                  {primaryScore ? <Badge variant="success">{primaryScore.toFixed(1)} {primaryScoreLabel}</Badge> : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

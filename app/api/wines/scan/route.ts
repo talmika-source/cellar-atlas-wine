@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     ...(await generateWineDraftFromScan(body.rawText)),
     imageUrl: body.imageUrl ?? ""
   };
-  const enriched = await enrichWineWithExternalScores(draft);
+  const enriched = await enrichWineWithExternalScores(draft, { deepCriticLookup: true });
 
   return NextResponse.json({ data: enriched });
 }

@@ -7,6 +7,7 @@ import { KpiCard } from "@/components/cards/kpi-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWineDisplayTitle, hasVintageInWineName } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
+import { getPrimaryCellarScore, getPrimaryCellarScoreLabel } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 
@@ -50,16 +51,23 @@ export function WineOverview() {
     readyBottles,
     highValueBottles,
     topRated,
-    peakBottles,
-    peakPriority,
-    totalCapacity,
-    totalOccupied
-  } = useMemo(() => {
+      peakBottles,
+      peakPriority,
+      averageScore,
+      averageScoreLabel,
+      totalCapacity,
+      totalOccupied
+    } = useMemo(() => {
     const cellarWines = wines.filter(isCellarWine);
     const totalBottleCount = cellarWines.reduce((sum, wine) => sum + wine.quantity, 0);
     const totalCellarValue = cellarWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
     const readyBottleCount = cellarWines.filter((wine) => wine.readiness !== "Hold").reduce((sum, wine) => sum + wine.quantity, 0);
     const peakBottleCount = cellarWines.filter((wine) => wine.readiness === "Peak").reduce((sum, wine) => sum + wine.quantity, 0);
+    const scoredWines = cellarWines
+      .map((wine) => ({ wine, score: getPrimaryCellarScore(wine) }))
+      .filter((entry) => entry.score !== null) as Array<{ wine: WineBottle; score: number }>;
+    const criticScoredCount = cellarWines.filter((wine) => getPrimaryCellarScoreLabel(wine) === "Critics").length;
+    const vivinoScoredCount = cellarWines.filter((wine) => getPrimaryCellarScoreLabel(wine) === "Vivino").length;
 
     return {
       totalBottles: totalBottleCount,
@@ -67,8 +75,17 @@ export function WineOverview() {
       readyBottles: readyBottleCount,
       peakBottles: peakBottleCount,
       highValueBottles: cellarWines.filter((wine) => wine.estimatedValue >= 100).length,
-      topRated: [...cellarWines].sort((a, b) => b.vivinoScore - a.vivinoScore).slice(0, 4),
+      topRated: [...cellarWines].sort((a, b) => (getPrimaryCellarScore(b) ?? 0) - (getPrimaryCellarScore(a) ?? 0)).slice(0, 4),
       peakPriority: cellarWines.filter((wine) => wine.readiness === "Peak").slice(0, 5),
+      averageScore: scoredWines.length
+        ? (scoredWines.reduce((sum, entry) => sum + entry.score, 0) / scoredWines.length).toFixed(2)
+        : "0.00",
+      averageScoreLabel:
+        criticScoredCount > 0
+          ? "Average critic-first score across tracked bottles."
+          : vivinoScoredCount > 0
+            ? "Average community score across tracked bottles."
+            : "No external scores available yet.",
       totalCapacity: locations.reduce((sum, location) => sum + location.capacity, 0),
       totalOccupied: totalBottleCount
     };
@@ -111,14 +128,10 @@ export function WineOverview() {
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
               <div className="flex items-center gap-2 text-sm text-rose-100/80">
                 <Star className="h-4 w-4" />
-                Collector score
+                Portfolio score
               </div>
-              <p className="mt-3 text-3xl font-semibold">
-                {wines.filter(isCellarWine).length
-                  ? (wines.filter(isCellarWine).reduce((sum, wine) => sum + wine.vivinoScore, 0) / wines.filter(isCellarWine).length).toFixed(2)
-                  : "0.00"}
-              </p>
-              <p className="mt-2 text-sm text-rose-100/80">Average Vivino score across the tracked portfolio.</p>
+              <p className="mt-3 text-3xl font-semibold">{averageScore}</p>
+              <p className="mt-2 text-sm text-rose-100/80">{averageScoreLabel}</p>
             </div>
           </CardContent>
         </Card>
@@ -207,7 +220,7 @@ export function WineOverview() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                  {wine.vivinoScore.toFixed(1)}
+                  {(getPrimaryCellarScore(wine) ?? 0).toFixed(1)}
                   <ArrowUpRight className="h-4 w-4" />
                 </div>
               </a>

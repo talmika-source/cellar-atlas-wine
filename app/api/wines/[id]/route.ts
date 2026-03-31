@@ -79,7 +79,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           notes: partialPatch.notes ?? currentWine.notes,
           cellarStatus: partialPatch.cellarStatus ?? currentWine.cellarStatus ?? "Cellar",
           drankOn: partialPatch.drankOn ?? currentWine.drankOn ?? ""
-        } satisfies WineInput, { deepCriticLookup: false })
+        } satisfies WineInput, { deepCriticLookup: true })
       : partialPatch;
 
   const wine = await updateWine(params.id, vivinoAwarePatch);
