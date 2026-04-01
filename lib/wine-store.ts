@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import { prisma } from "@/lib/db/prisma";
-import { enrichWineWithCriticScores, enrichWineWithMetadataSources } from "@/lib/critic-sources";
+import { type EnrichmentDebugEntry, enrichWineWithCriticScores, enrichWineWithMetadataSources } from "@/lib/critic-sources";
 import { fetchRenderedPage } from "@/lib/rendered-page";
 import { readStoredWines, writeStoredWines } from "@/lib/wine-file-store";
 import { getDefaultLocationId } from "@/lib/locations-store";
@@ -16,6 +16,7 @@ export type WineInput = Omit<WineRecord, "id">;
 
 type EnrichmentOptions = {
   deepCriticLookup?: boolean;
+  debugEntries?: EnrichmentDebugEntry[];
 };
 
 export class ExternalScoringUnavailableError extends Error {
@@ -23,6 +24,16 @@ export class ExternalScoringUnavailableError extends Error {
     super(message);
     this.name = "ExternalScoringUnavailableError";
   }
+}
+
+function pushDebug(
+  entries: EnrichmentDebugEntry[] | undefined,
+  stage: EnrichmentDebugEntry["stage"],
+  source: string,
+  status: EnrichmentDebugEntry["status"],
+  detail: string
+) {
+  entries?.push({ stage, source, status, detail });
 }
 
 const execFileAsync = promisify(execFile);
@@ -577,7 +588,7 @@ function extractVivinoScoreFromBrowserData(data: { html: string; title: string; 
   return Number.isNaN(score) ? null : score;
 }
 
-export async function enrichWineWithVivino(input: WineInput) {
+export async function enrichWineWithVivino(input: WineInput, debugEntries?: EnrichmentDebugEntry[]) {
   const manualVivinoLink = input.vivinoLink?.trim() ?? "";
   const searchQuery = buildVivinoSearchQuery(input);
   const searchUrl = buildVivinoSearchUrl(input);
@@ -585,12 +596,14 @@ export async function enrichWineWithVivino(input: WineInput) {
   const vivinoLink = manualVivinoLink || searchUrl;
 
   if (!vivinoLink) {
+    pushDebug(debugEntries, "vivino", "Vivino", "skipped", "No direct link or searchable wine details were available.");
     return input;
   }
 
   const sourceUrl = isDirectVivinoWineUrl(vivinoLink) ? vivinoLink : searchUrl;
 
-  if (!sourceUrl) {
+    if (!sourceUrl) {
+    pushDebug(debugEntries, "vivino", "Vivino", "skipped", "No usable Vivino source URL was available.");
     return {
       ...input,
       vivinoLink
@@ -626,6 +639,7 @@ export async function enrichWineWithVivino(input: WineInput) {
         const detailScore = parseVivinoScore(detailHtml);
 
         if (detailScore) {
+          pushDebug(debugEntries, "vivino", "Vivino fetch", "matched", `Parsed direct detail score ${detailScore}.`);
           return {
             ...input,
             vivinoLink: resolvedVivinoLink,
@@ -640,6 +654,7 @@ export async function enrichWineWithVivino(input: WineInput) {
     }
 
     if (score) {
+      pushDebug(debugEntries, "vivino", "Vivino fetch", "matched", `Parsed score ${score} from initial HTML.`);
       return {
         ...input,
         vivinoLink: resolvedVivinoLink,
@@ -649,7 +664,7 @@ export async function enrichWineWithVivino(input: WineInput) {
       };
     }
   } catch {
-    // Fall through to browser-based enrichment below.
+    pushDebug(debugEntries, "vivino", "Vivino fetch", "error", "Initial fetch failed or returned unreadable content.");
   }
 
   try {
@@ -662,6 +677,7 @@ export async function enrichWineWithVivino(input: WineInput) {
         : parseVivinoDirectLink(browserData.html, searchQuery) ?? browserData.finalUrl ?? vivinoLink;
 
     if (browserScore) {
+      pushDebug(debugEntries, "vivino", "Vivino browser", "matched", `Parsed browser-rendered score ${browserScore}.`);
       return {
         ...input,
         vivinoLink: browserResolvedLink,
@@ -681,6 +697,7 @@ export async function enrichWineWithVivino(input: WineInput) {
       const canonicalWindow = parseDrinkingWindow(canonicalData.html);
 
       if (canonicalScore) {
+        pushDebug(debugEntries, "vivino", "Vivino canonical browser", "matched", `Parsed canonical score ${canonicalScore}.`);
         return {
           ...input,
           vivinoLink: canonicalData.finalUrl || canonicalUrl,
@@ -694,18 +711,21 @@ export async function enrichWineWithVivino(input: WineInput) {
       }
     }
   } catch {
-    // Final fallback below preserves current data.
+    pushDebug(debugEntries, "vivino", "Vivino browser", "error", "Browser-rendered enrichment failed.");
   }
 
   const searchSnippetScore = await fetchVivinoSearchSnippetScore(input);
 
   if (searchSnippetScore) {
+    pushDebug(debugEntries, "vivino", "Vivino search snippet", "matched", `Parsed snippet score ${searchSnippetScore}.`);
     return {
       ...input,
       vivinoLink,
       vivinoScore: searchSnippetScore
     };
   }
+
+  pushDebug(debugEntries, "vivino", "Vivino", "no_match", "No Vivino score was found from fetch, browser, or search snippet fallbacks.");
 
   return {
     ...input,
@@ -739,8 +759,9 @@ function mergeEnrichmentResults(base: WineInput, criticResult: WineInput, vivino
 }
 
 export async function enrichWineWithExternalScores(input: WineInput, options: EnrichmentOptions = {}) {
+  const debugEntries = options.debugEntries;
   const withMetadata = await withTimeout(
-    enrichWineWithMetadataSources(input),
+    enrichWineWithMetadataSources(input, debugEntries),
     2500,
     () => input
   );
@@ -750,14 +771,14 @@ export async function enrichWineWithExternalScores(input: WineInput, options: En
     ? hasDirectVivinoLink ? 45000 : 15000
     : hasDirectVivinoLink ? 12000 : 2500;
   const criticPromise = withTimeout(
-    enrichWineWithCriticScores(withMetadata, { includeBrowserFallback: options.deepCriticLookup }),
+    enrichWineWithCriticScores(withMetadata, { includeBrowserFallback: options.deepCriticLookup, debugEntries }),
     criticTimeoutMs,
     () => withMetadata
   );
   const vivinoPromise =
     withMetadata.vivinoLink?.trim() || buildVivinoSearchUrl(withMetadata)
       ? withTimeout(
-          enrichWineWithVivino(withMetadata),
+          enrichWineWithVivino(withMetadata, debugEntries),
           vivinoTimeoutMs,
           () => withMetadata
         )

@@ -17,8 +17,16 @@ export type MetadataEnrichment = {
   metadataSource?: string;
 };
 
+export type EnrichmentDebugEntry = {
+  stage: "metadata" | "critics" | "vivino";
+  source: string;
+  status: "matched" | "no_match" | "error" | "skipped";
+  detail: string;
+};
+
 type CriticEnrichmentOptions = {
   includeBrowserFallback?: boolean;
+  debugEntries?: EnrichmentDebugEntry[];
 };
 
 type CandidateSource = {
@@ -34,6 +42,16 @@ type MetadataSource = {
   apiKey?: string | undefined;
   host?: string | undefined;
 };
+
+function pushDebug(
+  entries: EnrichmentDebugEntry[] | undefined,
+  stage: EnrichmentDebugEntry["stage"],
+  source: string,
+  status: EnrichmentDebugEntry["status"],
+  detail: string
+) {
+  entries?.push({ stage, source, status, detail });
+}
 
 type CriticLookupQuery = {
   wineName: string;
@@ -889,11 +907,20 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
   let jamesSucklingScore = input.jamesSucklingScore || 0;
   const sourcesUsed: string[] = [];
   const lookupQueries = buildLookupQueries(input);
+  const debugEntries = options.debugEntries;
 
   for (const source of candidateSources) {
     if (robertParkerScore > 0 && jamesSucklingScore > 0) {
       break;
     }
+
+    if (!source.endpoint || !source.apiKey) {
+      pushDebug(debugEntries, "critics", source.name, "skipped", "Not configured.");
+      continue;
+    }
+
+    let matched = false;
+    let lastError = "";
 
     for (const query of lookupQueries) {
       if (robertParkerScore > 0 && jamesSucklingScore > 0) {
@@ -907,19 +934,34 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
           continue;
         }
 
+        matched = true;
+
         robertParkerScore ||= result.robertParkerScore ?? 0;
         jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
 
         if (result.criticSource) {
           sourcesUsed.push(result.criticSource);
         }
+
+        pushDebug(
+          debugEntries,
+          "critics",
+          source.name,
+          "matched",
+          `Matched query "${buildCombinedQueryText(query)}" with RP ${result.robertParkerScore ?? 0}, JS ${result.jamesSucklingScore ?? 0}.`
+        );
       } catch {
-        // Ignore external critic source failures and keep current/manual values.
+        lastError = `Request failed for "${buildCombinedQueryText(query)}".`;
       }
+    }
+
+    if (!matched) {
+      pushDebug(debugEntries, "critics", source.name, lastError ? "error" : "no_match", lastError || "Configured, but returned no critic scores.");
     }
   }
 
   if (!robertParkerScore || !jamesSucklingScore) {
+    let matched = false;
     for (const query of lookupQueries) {
       if (robertParkerScore > 0 && jamesSucklingScore > 0) {
         break;
@@ -931,16 +973,25 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
         continue;
       }
 
+      matched = true;
+
       robertParkerScore ||= result.robertParkerScore ?? 0;
       jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
 
       if (result.criticSource) {
         sourcesUsed.push(result.criticSource);
       }
+
+      pushDebug(debugEntries, "critics", "Public search fallback", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
+    }
+
+    if (!matched) {
+      pushDebug(debugEntries, "critics", "Public search fallback", "no_match", "No public critic score snippets were found.");
     }
   }
 
   if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
+    let matched = false;
     for (const query of lookupQueries) {
       if (robertParkerScore > 0 && jamesSucklingScore > 0) {
         break;
@@ -952,16 +1003,25 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
         continue;
       }
 
+      matched = true;
+
       robertParkerScore ||= result.robertParkerScore ?? 0;
       jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
 
       if (result.criticSource) {
         sourcesUsed.push(result.criticSource);
       }
+
+      pushDebug(debugEntries, "critics", "Wine-Searcher page", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
+    }
+
+    if (!matched) {
+      pushDebug(debugEntries, "critics", "Wine-Searcher page", "no_match", "No page-level RP/JS scores were parsed.");
     }
   }
 
   if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
+    let matched = false;
     for (const query of lookupQueries) {
       if (robertParkerScore > 0 && jamesSucklingScore > 0) {
         break;
@@ -973,12 +1033,20 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
         continue;
       }
 
+      matched = true;
+
       robertParkerScore ||= result.robertParkerScore ?? 0;
       jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
 
       if (result.criticSource) {
         sourcesUsed.push(result.criticSource);
       }
+
+      pushDebug(debugEntries, "critics", "Wine-Searcher browser", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
+    }
+
+    if (!matched) {
+      pushDebug(debugEntries, "critics", "Wine-Searcher browser", "no_match", "No browser-rendered RP/JS scores were parsed.");
     }
   }
 
@@ -990,16 +1058,24 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
   };
 }
 
-export async function enrichWineWithMetadataSources(input: WineInput) {
+export async function enrichWineWithMetadataSources(input: WineInput, debugEntries?: EnrichmentDebugEntry[]) {
   const needsMetadata = !input.region || !input.country || !input.grape || !input.style;
 
   if (!needsMetadata) {
+    pushDebug(debugEntries, "metadata", "Metadata enrichment", "skipped", "Metadata already present.");
     return input;
   }
 
   const lookupQueries = buildLookupQueries(input);
 
   for (const source of metadataSources) {
+    if (!source.endpoint) {
+      pushDebug(debugEntries, "metadata", source.name, "skipped", "Not configured.");
+      continue;
+    }
+
+    let matched = false;
+    let lastError = "";
     for (const query of lookupQueries) {
       try {
         const result = await fetchMetadataSource(source, query);
@@ -1007,6 +1083,9 @@ export async function enrichWineWithMetadataSources(input: WineInput) {
         if (!result) {
           continue;
         }
+
+        matched = true;
+        pushDebug(debugEntries, "metadata", source.name, "matched", `Matched query "${buildCombinedQueryText(query)}".`);
 
         return {
           ...input,
@@ -1019,8 +1098,12 @@ export async function enrichWineWithMetadataSources(input: WineInput) {
           criticSource: input.criticSource || result.metadataSource || ""
         };
       } catch {
-        // Ignore metadata source failures and continue.
+        lastError = `Request failed for "${buildCombinedQueryText(query)}".`;
       }
+    }
+
+    if (!matched) {
+      pushDebug(debugEntries, "metadata", source.name, lastError ? "error" : "no_match", lastError || "Configured, but returned no metadata.");
     }
   }
 

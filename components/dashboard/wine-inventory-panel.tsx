@@ -17,6 +17,7 @@ import { formatWinePlacement } from "@/lib/wine-location-display";
 import { getPrimaryCellarScore, getPrimaryCellarScoreLabel } from "@/lib/wine-score";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 import { inferReadinessFromVintage } from "@/lib/wine-readiness";
+import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
 
 const readinessOptions = ["Hold", "Ready", "Peak"] as const;
 const grapeOptions = [
@@ -251,6 +252,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     });
   };
 
+  const summarizeDebug = (entries: EnrichmentDebugEntry[]) =>
+    entries
+      .slice(0, 6)
+      .map((entry) => `${entry.stage}: ${entry.source} - ${entry.status}. ${entry.detail}`)
+      .join(" | ");
+
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
     const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
@@ -469,10 +476,20 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           });
 
           if (enrichResponse.ok) {
-            const enrichPayload = await readResponsePayload<{ data?: WineBottle }>(enrichResponse);
+            const enrichPayload = await readResponsePayload<{ data?: WineBottle; debug?: EnrichmentDebugEntry[] }>(enrichResponse);
 
             if (enrichPayload.data) {
               mergeWineIntoState(enrichPayload.data);
+            }
+
+            if (
+              enrichPayload.data &&
+              enrichPayload.data.vivinoScore <= 0 &&
+              enrichPayload.data.robertParkerScore <= 0 &&
+              enrichPayload.data.jamesSucklingScore <= 0 &&
+              enrichPayload.debug?.length
+            ) {
+              setError(`No scores found. ${summarizeDebug(enrichPayload.debug)}`);
             }
 
             await loadWines();
@@ -542,10 +559,20 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         return;
       }
 
-      const payload = await readResponsePayload<{ data?: WineBottle }>(response);
+      const payload = await readResponsePayload<{ data?: WineBottle; debug?: EnrichmentDebugEntry[] }>(response);
 
       if (payload.data) {
         mergeWineIntoState(payload.data);
+      }
+
+      if (
+        payload.data &&
+        payload.data.vivinoScore <= 0 &&
+        payload.data.robertParkerScore <= 0 &&
+        payload.data.jamesSucklingScore <= 0 &&
+        payload.debug?.length
+      ) {
+        setError(`No scores found. ${summarizeDebug(payload.debug)}`);
       }
 
       await loadWines();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { enrichWineWithExternalScores, ExternalScoringUnavailableError, getWine, updateWine } from "@/lib/wine-store";
+import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
   try {
@@ -10,6 +11,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Wine not found" }, { status: 404 });
     }
 
+    const debug: EnrichmentDebugEntry[] = [];
     const enrichedWine = await enrichWineWithExternalScores({
       wineName: currentWine.wineName,
       producer: currentWine.producer,
@@ -38,7 +40,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       notes: currentWine.notes,
       cellarStatus: currentWine.cellarStatus ?? "Cellar",
       drankOn: currentWine.drankOn ?? ""
-    }, { deepCriticLookup: true });
+    }, { deepCriticLookup: true, debugEntries: debug });
 
     const wine = await updateWine(params.id, enrichedWine);
 
@@ -46,7 +48,7 @@ export async function POST(_request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: "Wine not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ data: wine });
+    return NextResponse.json({ data: wine, debug });
   } catch (error) {
     return NextResponse.json(
       {
