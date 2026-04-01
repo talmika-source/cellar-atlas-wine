@@ -226,7 +226,12 @@ export function buildVivinoSearchUrl(input: Partial<WineInput>) {
 }
 
 function isDirectVivinoWineUrl(value: string) {
-  return /^https:\/\/www\.vivino\.com\/[a-z]{2}(?:\/[a-z]{2})?\/.+\/w\/\d+/i.test(value.trim());
+  try {
+    const parsed = new URL(value.trim());
+    return /(^|\/)w\/\d+(?:$|[/?#])/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
 function hasEnoughDetailsForDirectVivinoResolution(input: Partial<WineInput>) {
@@ -299,7 +304,7 @@ function parseVivinoSearchResult(html: string, query: string) {
 
 function parseVivinoDirectLink(html: string, query: string) {
   const decoded = decodeHtmlEntities(html);
-  const regex = /href="(\/[a-z]{2}(?:\/[a-z]{2})?\/[^"]+\/w\/\d+(?:\?[^"]*)?)"/g;
+  const regex = /href="(\/[^"]*?\/w\/\d+(?:\?[^"]*)?)"/g;
   let best: { href: string; score: number } | null = null;
 
   for (const match of decoded.matchAll(regex)) {
@@ -680,7 +685,10 @@ export async function enrichWineWithExternalScores(input: WineInput, options: En
     () => input
   );
   const criticTimeoutMs = options.deepCriticLookup ? 12000 : 3500;
-  const vivinoTimeoutMs = options.deepCriticLookup ? 10000 : 2500;
+  const hasDirectVivinoLink = Boolean(withMetadata.vivinoLink?.trim() && isDirectVivinoWineUrl(withMetadata.vivinoLink));
+  const vivinoTimeoutMs = options.deepCriticLookup
+    ? hasDirectVivinoLink ? 20000 : 10000
+    : hasDirectVivinoLink ? 12000 : 2500;
   const criticPromise = withTimeout(
     enrichWineWithCriticScores(withMetadata, { includeBrowserFallback: options.deepCriticLookup }),
     criticTimeoutMs,
