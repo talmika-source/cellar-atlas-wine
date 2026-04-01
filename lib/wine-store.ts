@@ -6,7 +6,7 @@ import { enrichWineWithCriticScores } from "@/lib/critic-sources";
 import { fetchRenderedPage } from "@/lib/rendered-page";
 import { readStoredWines, writeStoredWines } from "@/lib/wine-file-store";
 import { getDefaultLocationId } from "@/lib/locations-store";
-import { mapReadinessToDb, mapWineRecord } from "@/lib/wine-persistence";
+import { mapCellarStatusToDb, mapReadinessToDb, mapWineRecord } from "@/lib/wine-persistence";
 import { type WineBottle } from "@/lib/wine-data";
 import { inferReadinessFromVintage } from "@/lib/wine-readiness";
 
@@ -83,7 +83,9 @@ export async function createWine(input: WineInput) {
         drinkWindow: input.drinkWindow || null,
         acquiredOn: input.acquiredOn ? new Date(`${input.acquiredOn}T00:00:00.000Z`) : null,
         supplierId: input.supplierId || null,
-        notes: input.notes || null
+        notes: input.notes || null,
+        cellarStatus: mapCellarStatusToDb(input.cellarStatus),
+        drankOn: input.drankOn ? new Date(`${input.drankOn}T00:00:00.000Z`) : null
       }
     });
 
@@ -141,7 +143,11 @@ export async function updateWine(id: string, patch: Partial<WineInput>) {
           ? { acquiredOn: patch.acquiredOn ? new Date(`${patch.acquiredOn}T00:00:00.000Z`) : null }
           : {}),
         ...(patch.supplierId !== undefined ? { supplierId: patch.supplierId || null } : {}),
-        ...(patch.notes !== undefined ? { notes: patch.notes || null } : {})
+        ...(patch.notes !== undefined ? { notes: patch.notes || null } : {}),
+        ...(patch.cellarStatus !== undefined ? { cellarStatus: mapCellarStatusToDb(patch.cellarStatus) } : {}),
+        ...(patch.drankOn !== undefined
+          ? { drankOn: patch.drankOn ? new Date(`${patch.drankOn}T00:00:00.000Z`) : null }
+          : {})
       }
     });
 

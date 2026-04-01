@@ -1,4 +1,4 @@
-import { StorageLocationType, WineReadiness, type WineEntry, type WineLocation } from "@prisma/client";
+import { StorageLocationType, WineCellarStatus, WineReadiness, type WineEntry, type WineLocation } from "@prisma/client";
 
 import { type StorageLocation, type WineBottle } from "@/lib/wine-data";
 
@@ -50,6 +50,14 @@ export function mapReadinessFromDb(readiness: WineReadiness): WineBottle["readin
   }
 }
 
+export function mapCellarStatusToDb(status: WineBottle["cellarStatus"] | undefined) {
+  return status === "Drank" ? WineCellarStatus.DRANK : WineCellarStatus.CELLAR;
+}
+
+export function mapCellarStatusFromDb(status: WineCellarStatus): WineBottle["cellarStatus"] {
+  return status === WineCellarStatus.DRANK ? "Drank" : "Cellar";
+}
+
 export function mapLocationRecord(record: WineLocation & { _count?: { wines?: number } }): StorageLocation {
   return {
     id: record.id,
@@ -92,7 +100,7 @@ export function mapWineRecord(record: WineEntry): WineBottle {
     acquiredOn: record.acquiredOn ? record.acquiredOn.toISOString().slice(0, 10) : "",
     supplierId: record.supplierId ?? "",
     notes: record.notes ?? "",
-    cellarStatus: "Cellar",
-    drankOn: ""
+    cellarStatus: mapCellarStatusFromDb(record.cellarStatus),
+    drankOn: record.drankOn ? record.drankOn.toISOString().slice(0, 10) : ""
   };
 }
