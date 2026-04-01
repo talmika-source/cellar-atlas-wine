@@ -35,6 +35,8 @@ Online scoring note:
 - For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
 - `DATABASE_URL` should point to your Postgres database.
 - `LWIN_API_URL` + `LWIN_API_KEY` and `OPEN_WINE_DATA_API_URL` + `OPEN_WINE_DATA_API_KEY` can enrich missing metadata like region, country, grape, and style.
+- `APIFY_API_TOKEN` enables Apify-based Vivino score extraction for wines that already have a direct Vivino bottle URL.
+- `APIFY_VIVINO_ACTOR_ID` is optional; when omitted, the app defaults to `mrbridge~vivino-ratings-scraper-from-url-list`.
 - `BRIGHTDATA_BROWSER_AUTH` or `BRIGHTDATA_BROWSER_USERNAME` + `BRIGHTDATA_BROWSER_PASSWORD` enables Bright Data as the primary managed browser for Vivino rendering.
 - `BRIGHTDATA_BROWSER_WS_ENDPOINT` can be used if Bright Data gives you a custom browser WebSocket endpoint.
 - `BROWSERLESS_API_TOKEN` lets the app render Vivino and Wine-Searcher pages online when plain fetches are blocked.
@@ -44,7 +46,7 @@ Online scoring note:
 Current production recommendation:
 - Use direct `Global Wine Score` for score enrichment.
 - Use `LWIN` and `Open Wine Data` for metadata only.
-- Keep `Vivino` as best-effort enrichment plus manual link/manual score when needed.
+- Use Apify for Vivino score extraction when a direct Vivino bottle URL is available, and keep manual score override when needed.
 - RapidAPI score providers are intentionally not part of the active production refresh flow because they proved unreliable on free tiers.
 
 Best deployment targets right now:

@@ -26,6 +26,8 @@ export class ExternalScoringUnavailableError extends Error {
   }
 }
 
+const DEFAULT_APIFY_VIVINO_ACTOR = "mrbridge~vivino-ratings-scraper-from-url-list";
+
 function pushDebug(
   entries: EnrichmentDebugEntry[] | undefined,
   stage: EnrichmentDebugEntry["stage"],
@@ -269,6 +271,84 @@ function decodeHtmlEntities(input: string) {
 
 function normalizeSearchText(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normalizeApifyActorId(value: string) {
+  return value.trim().replace(/\//g, "~");
+}
+
+function extractApifyVivinoScore(payload: unknown) {
+  if (!payload) {
+    return null;
+  }
+
+  const items = Array.isArray(payload) ? payload : [payload];
+
+  for (const item of items) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+
+    for (const key of ["rating", "score", "averageRating", "ratings_average", "vivinoScore"]) {
+      const value = record[key];
+
+      if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+        return value;
+      }
+
+      if (typeof value === "string") {
+        const match = value.match(/\b([3-5]\.\d)\b/);
+
+        if (match) {
+          return Number(match[1]);
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+async function fetchVivinoScoreFromApify(url: string) {
+  const token = process.env.APIFY_API_TOKEN?.trim();
+
+  if (!token) {
+    return null;
+  }
+
+  const actorId = normalizeApifyActorId(process.env.APIFY_VIVINO_ACTOR_ID?.trim() || DEFAULT_APIFY_VIVINO_ACTOR);
+  const endpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?memory=256&timeout=120`;
+  const input = {
+    wineUrls: [url],
+    urls: [url],
+    startUrls: [{ url }]
+  };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify(input),
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Apify HTTP ${response.status}`);
+  }
+
+  const payload = (await response.json()) as unknown;
+  const score = extractApifyVivinoScore(payload);
+
+  if (!score) {
+    return null;
+  }
+
+  return score;
 }
 
 function scoreNameMatch(candidateName: string, query: string) {
@@ -631,6 +711,33 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
       ...input,
       vivinoLink
     };
+  }
+
+  if (isDirectVivinoWineUrl(sourceUrl)) {
+    try {
+      const apifyScore = await fetchVivinoScoreFromApify(sourceUrl);
+
+      if (apifyScore) {
+        pushDebug(debugEntries, "vivino", "Vivino Apify", "matched", `Parsed Apify score ${apifyScore}.`);
+        return {
+          ...input,
+          vivinoLink: sourceUrl,
+          vivinoScore: apifyScore
+        };
+      }
+
+      pushDebug(debugEntries, "vivino", "Vivino Apify", "no_match", "Apify returned no usable Vivino score.");
+    } catch (error) {
+      pushDebug(
+        debugEntries,
+        "vivino",
+        "Vivino Apify",
+        "error",
+        error instanceof Error ? error.message : "Apify Vivino request failed."
+      );
+    }
+  } else {
+    pushDebug(debugEntries, "vivino", "Vivino Apify", "skipped", "Apify requires a direct Vivino wine URL.");
   }
 
   try {
