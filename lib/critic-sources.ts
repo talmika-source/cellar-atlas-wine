@@ -989,8 +989,8 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
           "matched",
           `Matched query "${buildCombinedQueryText(query)}" with RP ${result.robertParkerScore ?? 0}, JS ${result.jamesSucklingScore ?? 0}.`
         );
-      } catch {
-        lastError = `Request failed for "${buildCombinedQueryText(query)}".`;
+      } catch (error) {
+        lastError = `${error instanceof Error ? error.message : "Request failed"} for "${buildCombinedQueryText(query)}".`;
       }
     }
 
@@ -1136,8 +1136,8 @@ export async function enrichWineWithMetadataSources(input: WineInput, debugEntri
           style: input.style || result.style || "",
           criticSource: input.criticSource || result.metadataSource || ""
         };
-      } catch {
-        lastError = `Request failed for "${buildCombinedQueryText(query)}".`;
+      } catch (error) {
+        lastError = `${error instanceof Error ? error.message : "Request failed"} for "${buildCombinedQueryText(query)}".`;
       }
     }
 
