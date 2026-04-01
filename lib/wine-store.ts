@@ -375,6 +375,51 @@ function parseVivinoScore(html: string) {
   return null;
 }
 
+function stripHtml(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function fetchVivinoSearchSnippetScore(input: WineInput) {
+  const query = [input.producer, input.wineName, input.vintage ? String(input.vintage) : "", "site:vivino.com"]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (!query) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 CellarAtlas/1.0"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const html = await response.text();
+    const text = stripHtml(html);
+    return parseVivinoScore(text);
+  } catch {
+    return null;
+  }
+}
+
 function parseDrinkingWindow(html: string) {
   const patterns = [
     /drinking window[^0-9]{0,40}(\d{4})\s*[-–]\s*(\d{4})/i,
@@ -648,6 +693,16 @@ export async function enrichWineWithVivino(input: WineInput) {
     }
   } catch {
     // Final fallback below preserves current data.
+  }
+
+  const searchSnippetScore = await fetchVivinoSearchSnippetScore(input);
+
+  if (searchSnippetScore) {
+    return {
+      ...input,
+      vivinoLink,
+      vivinoScore: searchSnippetScore
+    };
   }
 
   return {
