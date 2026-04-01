@@ -829,6 +829,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                   {wine.vivinoScore > 0 ? <Badge variant="info">{wine.vivinoScore.toFixed(1)} Vivino</Badge> : null}
                   {wine.robertParkerScore > 0 ? <Badge variant="warning">RP {wine.robertParkerScore}</Badge> : null}
                   {wine.jamesSucklingScore > 0 ? <Badge variant="warning">JS {wine.jamesSucklingScore}</Badge> : null}
+                  {wine.criticSource ? <Badge variant="success">{wine.criticSource}</Badge> : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

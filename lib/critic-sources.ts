@@ -7,6 +7,16 @@ export type CriticScores = {
   criticSource?: string;
 };
 
+export type MetadataEnrichment = {
+  wineName?: string;
+  producer?: string;
+  region?: string;
+  country?: string;
+  grape?: string;
+  style?: string;
+  metadataSource?: string;
+};
+
 type CriticEnrichmentOptions = {
   includeBrowserFallback?: boolean;
 };
@@ -15,6 +25,14 @@ type CandidateSource = {
   name: string;
   endpoint: string | undefined;
   apiKey: string | undefined;
+  host?: string | undefined;
+};
+
+type MetadataSource = {
+  name: string;
+  endpoint: string | undefined;
+  apiKey?: string | undefined;
+  host?: string | undefined;
 };
 
 type CriticLookupQuery = {
@@ -25,7 +43,21 @@ type CriticLookupQuery = {
   country?: string;
 };
 
+function buildCombinedQueryText(query: CriticLookupQuery) {
+  return [query.producer, query.wineName, query.vintage, query.region, query.country]
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 const candidateSources: CandidateSource[] = [
+  {
+    name: "RapidAPI Wine Explorer",
+    endpoint: process.env.RAPIDAPI_WINE_API_URL,
+    apiKey: process.env.RAPIDAPI_WINE_API_KEY,
+    host: process.env.RAPIDAPI_WINE_API_HOST
+  },
   {
     name: "Wine-Searcher",
     endpoint: process.env.WINE_SEARCHER_API_URL,
@@ -35,6 +67,19 @@ const candidateSources: CandidateSource[] = [
     name: "Global Wine Score",
     endpoint: process.env.GLOBAL_WINE_SCORE_API_URL,
     apiKey: process.env.GLOBAL_WINE_SCORE_API_KEY
+  }
+];
+
+const metadataSources: MetadataSource[] = [
+  {
+    name: "LWIN",
+    endpoint: process.env.LWIN_API_URL,
+    apiKey: process.env.LWIN_API_KEY
+  },
+  {
+    name: "Open Wine Data",
+    endpoint: process.env.OPEN_WINE_DATA_API_URL,
+    apiKey: process.env.OPEN_WINE_DATA_API_KEY
   }
 ];
 
@@ -312,28 +357,111 @@ function walkCriticPayload(value: unknown, trail = ""): CriticScores {
   };
 }
 
+function extractStringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function walkMetadataPayload(value: unknown, trail = ""): MetadataEnrichment {
+  if (Array.isArray(value)) {
+    return value.reduce<MetadataEnrichment>((result, item, index) => {
+      const next = walkMetadataPayload(item, `${trail}[${index}]`);
+      return {
+        wineName: result.wineName ?? next.wineName,
+        producer: result.producer ?? next.producer,
+        region: result.region ?? next.region,
+        country: result.country ?? next.country,
+        grape: result.grape ?? next.grape,
+        style: result.style ?? next.style
+      };
+    }, {});
+  }
+
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  const entries = Object.entries(value as Record<string, unknown>);
+  let wineName: string | undefined;
+  let producer: string | undefined;
+  let region: string | undefined;
+  let country: string | undefined;
+  let grape: string | undefined;
+  let style: string | undefined;
+
+  for (const [key, nestedValue] of entries) {
+    const keyTrail = `${trail}.${key}`.toLowerCase();
+    const text = extractStringValue(nestedValue);
+
+    if (!wineName && text && /(wine.?name|label|cuv[eé]e|wine$|name$|full.?name)/i.test(keyTrail)) {
+      wineName = text;
+    }
+
+    if (!producer && text && /(producer|winery|estate|domain|chateau|bodega)/i.test(keyTrail)) {
+      producer = text;
+    }
+
+    if (!region && text && /(region|appellation|subregion|ava)/i.test(keyTrail)) {
+      region = text;
+    }
+
+    if (!country && text && /(country|nation)/i.test(keyTrail)) {
+      country = text;
+    }
+
+    if (!grape && text && /(grape|varietal|variety)/i.test(keyTrail)) {
+      grape = text;
+    }
+
+    if (!style && text && /(style|color|type)/i.test(keyTrail)) {
+      style = text;
+    }
+
+    const nested = walkMetadataPayload(nestedValue, keyTrail);
+    wineName ??= nested.wineName;
+    producer ??= nested.producer;
+    region ??= nested.region;
+    country ??= nested.country;
+    grape ??= nested.grape;
+    style ??= nested.style;
+  }
+
+  return { wineName, producer, region, country, grape, style };
+}
+
 async function fetchCriticSource(source: CandidateSource, query: CriticLookupQuery) {
   if (!source.endpoint || !source.apiKey) {
     return null;
   }
 
   const url = new URL(source.endpoint);
-  url.searchParams.set("wineName", query.wineName);
-  url.searchParams.set("producer", query.producer);
-  url.searchParams.set("vintage", query.vintage);
+  const combinedQuery = buildCombinedQueryText(query);
 
-  if (query.region) {
-    url.searchParams.set("region", query.region);
-  }
+  if (/rapidapi/i.test(source.name) || source.host) {
+    if (/wine_name=/i.test(url.pathname)) {
+      url.pathname = url.pathname.replace(/wine_name=[^/]+/i, `wine_name=${encodeURIComponent(combinedQuery || query.wineName)}`);
+    } else if (!url.searchParams.has("wine_name")) {
+      url.searchParams.set("wine_name", combinedQuery || query.wineName);
+    }
+  } else {
+    url.searchParams.set("wineName", query.wineName);
+    url.searchParams.set("producer", query.producer);
+    url.searchParams.set("vintage", query.vintage);
 
-  if (query.country) {
-    url.searchParams.set("country", query.country);
+    if (query.region) {
+      url.searchParams.set("region", query.region);
+    }
+
+    if (query.country) {
+      url.searchParams.set("country", query.country);
+    }
   }
 
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: `Bearer ${source.apiKey}`,
       "X-API-Key": source.apiKey,
+      ...(source.host ? { "X-RapidAPI-Host": source.host } : {}),
+      ...(source.apiKey && source.host ? { "X-RapidAPI-Key": source.apiKey } : {}),
       Accept: "application/json"
     },
     cache: "no-store"
@@ -353,6 +481,50 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
   return {
     ...scores,
     criticSource: source.name
+  };
+}
+
+async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQuery) {
+  if (!source.endpoint) {
+    return null;
+  }
+
+  const url = new URL(source.endpoint);
+  url.searchParams.set("wineName", query.wineName);
+  url.searchParams.set("producer", query.producer);
+  url.searchParams.set("vintage", query.vintage);
+
+  if (query.region) {
+    url.searchParams.set("region", query.region);
+  }
+
+  if (query.country) {
+    url.searchParams.set("country", query.country);
+  }
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      ...(source.apiKey ? { Authorization: `Bearer ${source.apiKey}`, "X-API-Key": source.apiKey } : {}),
+      ...(source.host && source.apiKey ? { "X-RapidAPI-Host": source.host, "X-RapidAPI-Key": source.apiKey } : {}),
+      Accept: "application/json"
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = (await response.json()) as unknown;
+  const metadata = walkMetadataPayload(payload);
+
+  if (!metadata.wineName && !metadata.producer && !metadata.region && !metadata.country && !metadata.grape && !metadata.style) {
+    return null;
+  }
+
+  return {
+    ...metadata,
+    metadataSource: source.name
   };
 }
 
@@ -706,4 +878,41 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
     jamesSucklingScore,
     criticSource: sourcesUsed.length > 0 ? Array.from(new Set(sourcesUsed)).join(" + ") : input.criticSource
   };
+}
+
+export async function enrichWineWithMetadataSources(input: WineInput) {
+  const needsMetadata = !input.region || !input.country || !input.grape || !input.style;
+
+  if (!needsMetadata) {
+    return input;
+  }
+
+  const lookupQueries = buildLookupQueries(input);
+
+  for (const source of metadataSources) {
+    for (const query of lookupQueries) {
+      try {
+        const result = await fetchMetadataSource(source, query);
+
+        if (!result) {
+          continue;
+        }
+
+        return {
+          ...input,
+          wineName: input.wineName || result.wineName || "",
+          producer: input.producer || result.producer || "",
+          region: input.region || result.region || "",
+          country: input.country || result.country || "",
+          grape: input.grape || result.grape || "",
+          style: input.style || result.style || "",
+          criticSource: input.criticSource || result.metadataSource || ""
+        };
+      } catch {
+        // Ignore metadata source failures and continue.
+      }
+    }
+  }
+
+  return input;
 }

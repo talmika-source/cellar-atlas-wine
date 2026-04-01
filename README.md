@@ -34,6 +34,9 @@ Important hosting note:
 Online scoring note:
 - For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
 - `DATABASE_URL` should point to your Postgres database.
+- `RAPIDAPI_WINE_API_URL`, `RAPIDAPI_WINE_API_KEY`, and `RAPIDAPI_WINE_API_HOST` add RapidAPI Wine Explorer as an extra score source.
+- `WINE_SEARCHER_API_URL` + `WINE_SEARCHER_API_KEY` add Wine-Searcher critic lookups.
+- `LWIN_API_URL` + `LWIN_API_KEY` and `OPEN_WINE_DATA_API_URL` + `OPEN_WINE_DATA_API_KEY` can enrich missing metadata like region, country, grape, and style.
 - `BRIGHTDATA_BROWSER_AUTH` or `BRIGHTDATA_BROWSER_USERNAME` + `BRIGHTDATA_BROWSER_PASSWORD` enables Bright Data as the primary managed browser for Vivino rendering.
 - `BRIGHTDATA_BROWSER_WS_ENDPOINT` can be used if Bright Data gives you a custom browser WebSocket endpoint.
 - `BROWSERLESS_API_TOKEN` lets the app render Vivino and Wine-Searcher pages online when plain fetches are blocked.

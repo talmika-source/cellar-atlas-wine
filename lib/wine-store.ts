@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 import { prisma } from "@/lib/db/prisma";
-import { enrichWineWithCriticScores } from "@/lib/critic-sources";
+import { enrichWineWithCriticScores, enrichWineWithMetadataSources } from "@/lib/critic-sources";
 import { fetchRenderedPage } from "@/lib/rendered-page";
 import { readStoredWines, writeStoredWines } from "@/lib/wine-file-store";
 import { getDefaultLocationId } from "@/lib/locations-store";
@@ -674,28 +674,33 @@ function mergeEnrichmentResults(base: WineInput, criticResult: WineInput, vivino
 }
 
 export async function enrichWineWithExternalScores(input: WineInput, options: EnrichmentOptions = {}) {
+  const withMetadata = await withTimeout(
+    enrichWineWithMetadataSources(input),
+    2500,
+    () => input
+  );
   const criticTimeoutMs = options.deepCriticLookup ? 12000 : 3500;
   const vivinoTimeoutMs = options.deepCriticLookup ? 10000 : 2500;
   const criticPromise = withTimeout(
-    enrichWineWithCriticScores(input, { includeBrowserFallback: options.deepCriticLookup }),
+    enrichWineWithCriticScores(withMetadata, { includeBrowserFallback: options.deepCriticLookup }),
     criticTimeoutMs,
-    () => input
+    () => withMetadata
   );
   const vivinoPromise =
-    input.vivinoLink?.trim() || buildVivinoSearchUrl(input)
+    withMetadata.vivinoLink?.trim() || buildVivinoSearchUrl(withMetadata)
       ? withTimeout(
-          enrichWineWithVivino(input),
+          enrichWineWithVivino(withMetadata),
           vivinoTimeoutMs,
-          () => input
+          () => withMetadata
         )
-      : Promise.resolve(input);
+      : Promise.resolve(withMetadata);
 
   const [criticResult, vivinoResult] = await Promise.allSettled([criticPromise, vivinoPromise]);
 
   return mergeEnrichmentResults(
-    input,
-    criticResult.status === "fulfilled" ? criticResult.value : input,
-    vivinoResult.status === "fulfilled" ? vivinoResult.value : input
+    withMetadata,
+    criticResult.status === "fulfilled" ? criticResult.value : withMetadata,
+    vivinoResult.status === "fulfilled" ? vivinoResult.value : withMetadata
   );
 }
 
