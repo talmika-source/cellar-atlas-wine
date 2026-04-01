@@ -255,6 +255,20 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   };
 
   const buildNoScoreMessage = (entries: EnrichmentDebugEntry[]) => {
+    const apifyEntry = entries.find((entry) => entry.source === "Vivino Apify" && entry.status !== "skipped");
+
+    if (apifyEntry?.status === "error") {
+      return `Apify Vivino lookup failed: ${apifyEntry.detail}`;
+    }
+
+    if (apifyEntry?.status === "no_match") {
+      return "Apify ran, but returned no usable Vivino score for this wine. You can enter the Vivino score manually.";
+    }
+
+    if (apifyEntry?.status === "matched") {
+      return "Vivino score lookup completed, but no score was saved. Please retry once, and if it repeats use manual score entry.";
+    }
+
     const hasConfiguredAutomaticSource = entries.some(
       (entry) =>
         (entry.stage === "critics" || entry.stage === "vivino") &&
