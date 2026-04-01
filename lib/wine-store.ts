@@ -747,7 +747,7 @@ export async function enrichWineWithExternalScores(input: WineInput, options: En
   const criticTimeoutMs = options.deepCriticLookup ? 12000 : 3500;
   const hasDirectVivinoLink = Boolean(withMetadata.vivinoLink?.trim() && isDirectVivinoWineUrl(withMetadata.vivinoLink));
   const vivinoTimeoutMs = options.deepCriticLookup
-    ? hasDirectVivinoLink ? 20000 : 10000
+    ? hasDirectVivinoLink ? 45000 : 15000
     : hasDirectVivinoLink ? 12000 : 2500;
   const criticPromise = withTimeout(
     enrichWineWithCriticScores(withMetadata, { includeBrowserFallback: options.deepCriticLookup }),
