@@ -220,6 +220,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [scanImageUrl, setScanImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -399,11 +400,13 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
   const openCreateDialog = () => {
     resetForm();
+    setStatusMessage(null);
     setDialogOpen(true);
   };
 
   const openScanDialog = () => {
     resetScanAssist();
+    setStatusMessage(null);
     setScanDialogOpen(true);
   };
 
@@ -411,6 +414,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     setEditingWine(wine);
     setForm(toFormState(wine, locations));
     setError(null);
+    setStatusMessage(null);
     setDialogOpen(true);
   };
 
@@ -421,6 +425,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     }
 
     setError(null);
+    setStatusMessage(null);
     startTransition(async () => {
       const response = await fetch(editingWine ? `/api/wines/${editingWine.id}` : "/api/wines", {
         method: editingWine ? "PATCH" : "POST",
@@ -489,7 +494,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               enrichPayload.data.jamesSucklingScore <= 0 &&
               enrichPayload.debug?.length
             ) {
-              setError(`No scores found. ${summarizeDebug(enrichPayload.debug)}`);
+              setStatusMessage(`No scores found. ${summarizeDebug(enrichPayload.debug)}`);
             }
 
             await loadWines();
@@ -506,13 +511,14 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   };
 
   const removeWine = (wine: WineBottle) => {
-    const confirmed = window.confirm(`Delete ${wine.producer} ${wine.wineName}?`);
+      const confirmed = window.confirm(`Delete ${wine.producer} ${wine.wineName}?`);
 
     if (!confirmed) {
       return;
     }
 
     startTransition(async () => {
+      setStatusMessage(null);
       await fetch(`/api/wines/${wine.id}`, { method: "DELETE" });
       await Promise.all([loadWines(), loadLocations()]);
     });
@@ -526,6 +532,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     }
 
     startTransition(async () => {
+      setStatusMessage(null);
       const response = await fetch(`/api/wines/${wine.id}`, {
         method: "PATCH",
         headers: {
@@ -549,13 +556,14 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
   const refreshVivino = (wine: WineBottle) => {
     startTransition(async () => {
+      setStatusMessage(null);
       const response = await fetch(`/api/wines/${wine.id}/enrich`, {
         method: "POST"
       });
 
       if (!response.ok) {
         const payload = await readResponsePayload<{ error?: string }>(response);
-        setError(payload.error ?? "Unable to refresh external scores for this wine.");
+        setStatusMessage(payload.error ?? "Unable to refresh external scores for this wine.");
         return;
       }
 
@@ -572,7 +580,15 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         payload.data.jamesSucklingScore <= 0 &&
         payload.debug?.length
       ) {
-        setError(`No scores found. ${summarizeDebug(payload.debug)}`);
+        setStatusMessage(`No scores found. ${summarizeDebug(payload.debug)}`);
+      } else if (payload.data) {
+        const badges = [
+          payload.data.vivinoScore > 0 ? `Vivino ${payload.data.vivinoScore.toFixed(1)}` : "",
+          payload.data.robertParkerScore > 0 ? `RP ${payload.data.robertParkerScore}` : "",
+          payload.data.jamesSucklingScore > 0 ? `JS ${payload.data.jamesSucklingScore}` : ""
+        ].filter(Boolean);
+
+        setStatusMessage(badges.length > 0 ? `Scores updated: ${badges.join(" | ")}` : "Refresh completed.");
       }
 
       await loadWines();
@@ -672,6 +688,11 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">
+          {statusMessage ? (
+            <div className="md:col-span-2 rounded-2xl border border-border/80 bg-secondary/40 px-4 py-3 text-sm text-foreground">
+              {statusMessage}
+            </div>
+          ) : null}
           <div className="space-y-2">
             <p className="text-sm font-medium">Location</p>
             <NativeSelect value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
