@@ -63,6 +63,14 @@ type CriticLookupQuery = {
 
 type ScoreLabel = "rp" | "js";
 
+function isRapidApiGlobalWineScoreSource(source: { name: string }) {
+  return /rapidapi global wine score/i.test(source.name);
+}
+
+function isGlobalWineScoreLatestEndpoint(endpoint: string | undefined) {
+  return /\/globalwinescores\/latest\b/i.test(endpoint ?? "");
+}
+
 function buildCombinedQueryText(query: CriticLookupQuery) {
   return [query.producer, query.wineName, query.vintage, query.region, query.country]
     .filter(Boolean)
@@ -184,6 +192,123 @@ function tokenizeLookupText(value: string) {
     .toLowerCase()
     .split(" ")
     .filter(Boolean);
+}
+
+function pickPayloadCollection(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+
+  for (const key of ["results", "data", "items", "records", "wines", "rows"]) {
+    const candidate = record[key];
+
+    if (Array.isArray(candidate)) {
+      return candidate;
+    }
+  }
+
+  return [];
+}
+
+function buildPayloadLookupText(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  const record = value as Record<string, unknown>;
+  const parts = [
+    pickObjectString(record, ["wine", "wine_name", "wineName", "name", "label", "full_name", "fullName"]),
+    pickObjectString(record, ["producer", "winery", "estate", "domain", "chateau", "brand"]),
+    pickObjectString(record, ["region", "appellation", "subregion"]),
+    pickObjectString(record, ["country"]),
+    pickObjectString(record, ["vintage", "year"])
+  ].filter(Boolean);
+
+  return normalizeLookupText(parts.join(" "));
+}
+
+function scorePayloadMatch(entry: unknown, query: CriticLookupQuery) {
+  const haystack = buildPayloadLookupText(entry);
+
+  if (!haystack) {
+    return 0;
+  }
+
+  const combinedQuery = normalizeLookupText(buildCombinedQueryText(query));
+  const wineTokens = tokenizeLookupText(query.wineName);
+  const producerTokens = tokenizeLookupText(query.producer);
+  const regionTokens = tokenizeLookupText(query.region ?? "");
+  const countryTokens = tokenizeLookupText(query.country ?? "");
+  const vintage = query.vintage.trim();
+  let score = 0;
+
+  if (combinedQuery && haystack.includes(combinedQuery)) {
+    score += 10;
+  }
+
+  for (const token of wineTokens) {
+    if (haystack.includes(token)) {
+      score += 3;
+    }
+  }
+
+  for (const token of producerTokens) {
+    if (haystack.includes(token)) {
+      score += 4;
+    }
+  }
+
+  for (const token of regionTokens) {
+    if (haystack.includes(token)) {
+      score += 2;
+    }
+  }
+
+  for (const token of countryTokens) {
+    if (haystack.includes(token)) {
+      score += 1;
+    }
+  }
+
+  if (vintage && haystack.includes(vintage)) {
+    score += 4;
+  }
+
+  return score;
+}
+
+function findBestPayloadMatch(payload: unknown, query: CriticLookupQuery) {
+  const collection = pickPayloadCollection(payload);
+  let bestEntry: unknown = null;
+  let bestScore = 0;
+
+  for (const entry of collection) {
+    const currentScore = scorePayloadMatch(entry, query);
+
+    if (currentScore > bestScore) {
+      bestScore = currentScore;
+      bestEntry = entry;
+    }
+  }
+
+  return bestScore >= 8 ? bestEntry : null;
+}
+
+async function parseJsonResponse(response: Response, queryText: string) {
+  const raw = await response.text();
+
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    const snippet = raw.replace(/\s+/g, " ").slice(0, 80);
+    throw new Error(`Expected JSON but received: ${snippet} for "${queryText}"`);
+  }
 }
 
 function buildWineSearcherUrl(query: CriticLookupQuery) {
@@ -550,7 +675,10 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
   const asciiCombinedName = asciiLookupText(combinedName || query.wineName);
   const asciiCombinedQuery = asciiLookupText(combinedQuery);
 
-  if (/rapidapi/i.test(source.name) || source.host) {
+  const usesRapidApiHeaders = /rapidapi/i.test(source.name) || source.host;
+  const isGlobalWineScoreLatest = isRapidApiGlobalWineScoreSource(source) && isGlobalWineScoreLatestEndpoint(source.endpoint);
+
+  if (usesRapidApiHeaders && !isGlobalWineScoreLatest) {
     if (/wine_name=/i.test(url.pathname)) {
       const encodedTerm = encodeURIComponent(asciiCombinedQuery || asciiCombinedName || asciiWineName || query.wineName);
       url.pathname = url.pathname.replace(/wine_name=[^/]+/i, `wine_name=${encodedTerm}`);
@@ -571,6 +699,18 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
       url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
       url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
       url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
+    }
+  } else if (isGlobalWineScoreLatest) {
+    if (!url.searchParams.has("limit")) {
+      url.searchParams.set("limit", "100");
+    }
+
+    if (!url.searchParams.has("ordering")) {
+      url.searchParams.set("ordering", "-date");
+    }
+
+    if (query.vintage && !url.searchParams.has("vintage")) {
+      url.searchParams.set("vintage", query.vintage);
     }
   } else {
     url.searchParams.set("wineName", asciiWineName || query.wineName);
@@ -615,8 +755,9 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
     throw new Error(`HTTP ${response.status}`);
   }
 
-  const payload = (await response.json()) as unknown;
-  const scores = walkCriticPayload(payload);
+  const payload = await parseJsonResponse(response, asciiCombinedQuery || combinedQuery);
+  const matchedPayload = isGlobalWineScoreLatest ? findBestPayloadMatch(payload, query) ?? payload : payload;
+  const scores = walkCriticPayload(matchedPayload);
 
   if (!scores.robertParkerScore && !scores.jamesSucklingScore) {
     return null;
@@ -640,25 +781,41 @@ async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQu
   const asciiProducer = asciiLookupText(query.producer);
   const asciiCombinedName = asciiLookupText(combinedName || query.wineName);
   const asciiCombinedQuery = asciiLookupText(combinedQuery);
-  url.searchParams.set("wineName", asciiWineName || query.wineName);
-  url.searchParams.set("producer", asciiProducer || query.producer);
-  url.searchParams.set("vintage", query.vintage);
-  url.searchParams.set("q", asciiCombinedQuery || combinedQuery);
-  url.searchParams.set("query", asciiCombinedQuery || combinedQuery);
-  url.searchParams.set("search", asciiCombinedQuery || combinedQuery);
-  url.searchParams.set("name", asciiCombinedName || combinedName || query.wineName);
-  url.searchParams.set("wine_name", asciiCombinedName || combinedName || query.wineName);
-  url.searchParams.set("wine", asciiCombinedName || combinedName || query.wineName);
-  url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
-  url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
-  url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
+  const isGlobalWineScoreLatest = isRapidApiGlobalWineScoreSource(source) && isGlobalWineScoreLatestEndpoint(source.endpoint);
 
-  if (query.region) {
-    url.searchParams.set("region", asciiLookupText(query.region) || query.region);
-  }
+  if (isGlobalWineScoreLatest) {
+    if (!url.searchParams.has("limit")) {
+      url.searchParams.set("limit", "100");
+    }
 
-  if (query.country) {
-    url.searchParams.set("country", asciiLookupText(query.country) || query.country);
+    if (!url.searchParams.has("ordering")) {
+      url.searchParams.set("ordering", "-date");
+    }
+
+    if (query.vintage && !url.searchParams.has("vintage")) {
+      url.searchParams.set("vintage", query.vintage);
+    }
+  } else {
+    url.searchParams.set("wineName", asciiWineName || query.wineName);
+    url.searchParams.set("producer", asciiProducer || query.producer);
+    url.searchParams.set("vintage", query.vintage);
+    url.searchParams.set("q", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("query", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("search", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("name", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("wine_name", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("wine", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
+
+    if (query.region) {
+      url.searchParams.set("region", asciiLookupText(query.region) || query.region);
+    }
+
+    if (query.country) {
+      url.searchParams.set("country", asciiLookupText(query.country) || query.country);
+    }
   }
 
   const headers: Record<string, string> = {
@@ -682,8 +839,9 @@ async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQu
     throw new Error(`HTTP ${response.status}`);
   }
 
-  const payload = (await response.json()) as unknown;
-  const metadata = walkMetadataPayload(payload);
+  const payload = await parseJsonResponse(response, asciiCombinedQuery || combinedQuery);
+  const matchedPayload = isGlobalWineScoreLatest ? findBestPayloadMatch(payload, query) ?? payload : payload;
+  const metadata = walkMetadataPayload(matchedPayload);
 
   if (!metadata.wineName && !metadata.producer && !metadata.region && !metadata.country && !metadata.grape && !metadata.style) {
     return null;
