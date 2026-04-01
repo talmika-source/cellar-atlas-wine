@@ -301,51 +301,91 @@ function getBaseVivinoWineUrl(url: string) {
   }
 }
 
+function extractApifyScoreValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 3 && value <= 5) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const match = value.match(/\b([3-5]\.\d)\b/);
+    return match ? Number(match[1]) : null;
+  }
+
+  return null;
+}
+
+function extractYearValue(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1900 && value <= 2100) {
+    return value;
+  }
+
+  if (typeof value === "string" && /^\d{4}$/.test(value)) {
+    return Number(value);
+  }
+
+  return null;
+}
+
+function walkApifyVivinoScore(value: unknown, targetYear: number | null): { exact: number | null; fallback: number | null } {
+  if (!value) {
+    return { exact: null, fallback: null };
+  }
+
+  if (Array.isArray(value)) {
+    let exact: number | null = null;
+    let fallback: number | null = null;
+
+    for (const item of value) {
+      const next = walkApifyVivinoScore(item, targetYear);
+      exact ??= next.exact;
+      fallback ??= next.fallback;
+
+      if (exact !== null) {
+        break;
+      }
+    }
+
+    return { exact, fallback };
+  }
+
+  if (typeof value !== "object") {
+    return { exact: null, fallback: null };
+  }
+
+  const record = value as Record<string, unknown>;
+  const ownYear =
+    extractYearValue(record.vintage) ??
+    extractYearValue(record.year) ??
+    extractYearValue(record.vintageYear);
+
+  let exact: number | null = null;
+  let fallback: number | null = null;
+
+  for (const [key, nestedValue] of Object.entries(record)) {
+    const normalizedKey = key.toLowerCase();
+    const looksLikeScoreKey = /(rating|score|average)/i.test(normalizedKey);
+    const directScore = looksLikeScoreKey ? extractApifyScoreValue(nestedValue) : null;
+
+    if (directScore !== null) {
+      if (targetYear !== null && ownYear === targetYear) {
+        exact ??= directScore;
+      } else {
+        fallback ??= directScore;
+      }
+    }
+
+    const nested = walkApifyVivinoScore(nestedValue, targetYear);
+    exact ??= nested.exact;
+    fallback ??= nested.fallback;
+  }
+
+  return { exact, fallback };
+}
+
 function extractApifyVivinoScore(payload: unknown, url: string) {
-  if (!payload) {
-    return null;
-  }
-
-  const items = Array.isArray(payload) ? payload : [payload];
   const targetYear = getVivinoUrlYear(url);
-  let fallbackScore: number | null = null;
-
-  for (const item of items) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const record = item as Record<string, unknown>;
-    const vintage = typeof record.vintage === "number" ? record.vintage : typeof record.vintage === "string" ? Number(record.vintage) : null;
-
-    for (const key of ["rating", "score", "averageRating", "ratings_average", "vivinoScore", "overallRating"]) {
-      const value = record[key];
-
-      if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-        if (targetYear && vintage === targetYear) {
-          return value;
-        }
-
-        fallbackScore ??= value;
-      }
-
-      if (typeof value === "string") {
-        const match = value.match(/\b([3-5]\.\d)\b/);
-
-        if (match) {
-          const parsed = Number(match[1]);
-
-          if (targetYear && vintage === targetYear) {
-            return parsed;
-          }
-
-          fallbackScore ??= parsed;
-        }
-      }
-    }
-  }
-
-  return fallbackScore;
+  const { exact, fallback } = walkApifyVivinoScore(payload, targetYear);
+  return exact ?? fallback;
 }
 
 async function fetchVivinoScoreFromApify(url: string) {
