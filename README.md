@@ -34,9 +34,6 @@ Important hosting note:
 Online scoring note:
 - For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
 - `DATABASE_URL` should point to your Postgres database.
-- `RAPIDAPI_WINE_API_URL`, `RAPIDAPI_WINE_API_KEY`, and `RAPIDAPI_WINE_API_HOST` add RapidAPI Wine Explorer as an extra score and metadata source.
-- `RAPIDAPI_GLOBAL_WINE_SCORE_URL`, `RAPIDAPI_GLOBAL_WINE_SCORE_KEY`, and `RAPIDAPI_GLOBAL_WINE_SCORE_HOST` add RapidAPI Global Wine Score as another score and metadata source.
-- `RAPIDAPI_VINHUB_URL`, `RAPIDAPI_VINHUB_KEY`, and `RAPIDAPI_VINHUB_HOST` add RapidAPI VinHub as another score and metadata source.
 - `WINE_SEARCHER_API_URL` + `WINE_SEARCHER_API_KEY` add Wine-Searcher critic lookups.
 - `LWIN_API_URL` + `LWIN_API_KEY` and `OPEN_WINE_DATA_API_URL` + `OPEN_WINE_DATA_API_KEY` can enrich missing metadata like region, country, grape, and style.
 - `BRIGHTDATA_BROWSER_AUTH` or `BRIGHTDATA_BROWSER_USERNAME` + `BRIGHTDATA_BROWSER_PASSWORD` enables Bright Data as the primary managed browser for Vivino rendering.
@@ -44,6 +41,12 @@ Online scoring note:
 - `BROWSERLESS_API_TOKEN` lets the app render Vivino and Wine-Searcher pages online when plain fetches are blocked.
 - If Vivino is still blocked, set `BROWSERLESS_USE_RESIDENTIAL_PROXY=true`. You can also set `BROWSERLESS_PROXY_COUNTRY` if your Browserless plan supports it.
 - `WINE_SEARCHER_API_URL` + `WINE_SEARCHER_API_KEY` and `GLOBAL_WINE_SCORE_API_URL` + `GLOBAL_WINE_SCORE_API_KEY` are optional critic APIs that improve Robert Parker and James Suckling coverage.
+
+Current production recommendation:
+- Use `Wine-Searcher` and direct `Global Wine Score` for score enrichment.
+- Use `LWIN` and `Open Wine Data` for metadata only.
+- Keep `Vivino` as best-effort enrichment plus manual link/manual score when needed.
+- RapidAPI score providers are intentionally not part of the active production refresh flow because they proved unreliable on free tiers.
 
 Best deployment targets right now:
 - Hostinger VPS
