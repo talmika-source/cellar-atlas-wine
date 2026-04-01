@@ -256,7 +256,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
   const summarizeDebug = (entries: EnrichmentDebugEntry[]) =>
     entries
-      .slice(0, 6)
       .map((entry) => `${entry.stage}: ${entry.source} - ${entry.status}. ${entry.detail}`)
       .join(" | ");
 

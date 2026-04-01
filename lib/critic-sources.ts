@@ -181,6 +181,16 @@ function normalizeLookupText(value: string) {
     .trim();
 }
 
+function asciiLookupText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "")
+    .replace(/[^a-zA-Z0-9\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function tokenizeLookupText(value: string) {
   return normalizeLookupText(value)
     .toLowerCase()
@@ -547,33 +557,52 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
   const url = new URL(source.endpoint);
   const combinedQuery = buildCombinedQueryText(query);
   const combinedName = [query.producer, query.wineName].filter(Boolean).join(" ").trim();
+  const asciiWineName = asciiLookupText(query.wineName);
+  const asciiProducer = asciiLookupText(query.producer);
+  const asciiCombinedName = asciiLookupText(combinedName || query.wineName);
+  const asciiCombinedQuery = asciiLookupText(combinedQuery);
 
   if (/rapidapi/i.test(source.name) || source.host) {
     if (/wine_name=/i.test(url.pathname)) {
-      const encodedTerm = encodeURIComponent(combinedQuery || combinedName || query.wineName);
+      const encodedTerm = encodeURIComponent(asciiCombinedQuery || asciiCombinedName || asciiWineName || query.wineName);
       url.pathname = url.pathname.replace(/wine_name=[^/]+/i, `wine_name=${encodedTerm}`);
     } else if (!url.searchParams.has("wine_name")) {
-      url.searchParams.set("wine_name", combinedQuery || combinedName || query.wineName);
+      url.searchParams.set("wine_name", asciiCombinedQuery || asciiCombinedName || asciiWineName || query.wineName);
     }
 
-    url.searchParams.set("wineName", combinedName || query.wineName);
-    url.searchParams.set("producer", query.producer);
+    url.searchParams.set("wineName", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("producer", asciiProducer || query.producer);
     url.searchParams.set("vintage", query.vintage);
+    url.searchParams.set("q", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("query", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("search", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("name", asciiCombinedName || combinedName || query.wineName);
+
+    if (/global wine score/i.test(source.name)) {
+      url.searchParams.set("wine", asciiCombinedName || combinedName || query.wineName);
+      url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
+      url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
+      url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
+    }
   } else {
-    url.searchParams.set("wineName", query.wineName);
-    url.searchParams.set("producer", query.producer);
+    url.searchParams.set("wineName", asciiWineName || query.wineName);
+    url.searchParams.set("producer", asciiProducer || query.producer);
     url.searchParams.set("vintage", query.vintage);
-    url.searchParams.set("q", combinedQuery);
-    url.searchParams.set("query", combinedQuery);
-    url.searchParams.set("search", combinedQuery);
-    url.searchParams.set("name", combinedName || query.wineName);
+    url.searchParams.set("q", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("query", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("search", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("name", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("wine", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
+    url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
+    url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
 
     if (query.region) {
-      url.searchParams.set("region", query.region);
+      url.searchParams.set("region", asciiLookupText(query.region) || query.region);
     }
 
     if (query.country) {
-      url.searchParams.set("country", query.country);
+      url.searchParams.set("country", asciiLookupText(query.country) || query.country);
     }
   }
 
@@ -613,21 +642,29 @@ async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQu
   const url = new URL(source.endpoint);
   const combinedQuery = buildCombinedQueryText(query);
   const combinedName = [query.producer, query.wineName].filter(Boolean).join(" ").trim();
-  url.searchParams.set("wineName", query.wineName);
-  url.searchParams.set("producer", query.producer);
+  const asciiWineName = asciiLookupText(query.wineName);
+  const asciiProducer = asciiLookupText(query.producer);
+  const asciiCombinedName = asciiLookupText(combinedName || query.wineName);
+  const asciiCombinedQuery = asciiLookupText(combinedQuery);
+  url.searchParams.set("wineName", asciiWineName || query.wineName);
+  url.searchParams.set("producer", asciiProducer || query.producer);
   url.searchParams.set("vintage", query.vintage);
-  url.searchParams.set("q", combinedQuery);
-  url.searchParams.set("query", combinedQuery);
-  url.searchParams.set("search", combinedQuery);
-  url.searchParams.set("name", combinedName || query.wineName);
-  url.searchParams.set("wine_name", combinedName || query.wineName);
+  url.searchParams.set("q", asciiCombinedQuery || combinedQuery);
+  url.searchParams.set("query", asciiCombinedQuery || combinedQuery);
+  url.searchParams.set("search", asciiCombinedQuery || combinedQuery);
+  url.searchParams.set("name", asciiCombinedName || combinedName || query.wineName);
+  url.searchParams.set("wine_name", asciiCombinedName || combinedName || query.wineName);
+  url.searchParams.set("wine", asciiCombinedName || combinedName || query.wineName);
+  url.searchParams.set("winename", asciiCombinedName || combinedName || query.wineName);
+  url.searchParams.set("keyword", asciiCombinedQuery || combinedQuery);
+  url.searchParams.set("term", asciiCombinedQuery || combinedQuery);
 
   if (query.region) {
-    url.searchParams.set("region", query.region);
+    url.searchParams.set("region", asciiLookupText(query.region) || query.region);
   }
 
   if (query.country) {
-    url.searchParams.set("country", query.country);
+    url.searchParams.set("country", asciiLookupText(query.country) || query.country);
   }
 
   const response = await fetch(url.toString(), {
