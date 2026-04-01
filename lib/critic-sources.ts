@@ -81,11 +81,6 @@ function buildCombinedQueryText(query: CriticLookupQuery) {
 
 const candidateSources: CandidateSource[] = [
   {
-    name: "Wine-Searcher",
-    endpoint: process.env.WINE_SEARCHER_API_URL,
-    apiKey: process.env.WINE_SEARCHER_API_KEY
-  },
-  {
     name: "Global Wine Score",
     endpoint: process.env.GLOBAL_WINE_SCORE_API_URL,
     apiKey: process.env.GLOBAL_WINE_SCORE_API_KEY
@@ -1130,96 +1125,6 @@ export async function enrichWineWithCriticScores(input: WineInput, options: Crit
 
     if (!matched) {
       pushDebug(debugEntries, "critics", source.name, lastError ? "error" : "no_match", lastError || "Configured, but returned no critic scores.");
-    }
-  }
-
-  if (!robertParkerScore || !jamesSucklingScore) {
-    let matched = false;
-    for (const query of lookupQueries) {
-      if (robertParkerScore > 0 && jamesSucklingScore > 0) {
-        break;
-      }
-
-      const result = await fetchPublicCriticScores(query);
-
-      if (!result) {
-        continue;
-      }
-
-      matched = true;
-
-      robertParkerScore ||= result.robertParkerScore ?? 0;
-      jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
-
-      if (result.criticSource) {
-        sourcesUsed.push(result.criticSource);
-      }
-
-      pushDebug(debugEntries, "critics", "Public search fallback", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
-    }
-
-    if (!matched) {
-      pushDebug(debugEntries, "critics", "Public search fallback", "no_match", "No public critic score snippets were found.");
-    }
-  }
-
-  if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
-    let matched = false;
-    for (const query of lookupQueries) {
-      if (robertParkerScore > 0 && jamesSucklingScore > 0) {
-        break;
-      }
-
-      const result = await fetchWineSearcherPageScores(query);
-
-      if (!result) {
-        continue;
-      }
-
-      matched = true;
-
-      robertParkerScore ||= result.robertParkerScore ?? 0;
-      jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
-
-      if (result.criticSource) {
-        sourcesUsed.push(result.criticSource);
-      }
-
-      pushDebug(debugEntries, "critics", "Wine-Searcher page", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
-    }
-
-    if (!matched) {
-      pushDebug(debugEntries, "critics", "Wine-Searcher page", "no_match", "No page-level RP/JS scores were parsed.");
-    }
-  }
-
-  if (options.includeBrowserFallback && (!robertParkerScore || !jamesSucklingScore)) {
-    let matched = false;
-    for (const query of lookupQueries) {
-      if (robertParkerScore > 0 && jamesSucklingScore > 0) {
-        break;
-      }
-
-      const result = await fetchWineSearcherRenderedScores(query);
-
-      if (!result) {
-        continue;
-      }
-
-      matched = true;
-
-      robertParkerScore ||= result.robertParkerScore ?? 0;
-      jamesSucklingScore ||= result.jamesSucklingScore ?? 0;
-
-      if (result.criticSource) {
-        sourcesUsed.push(result.criticSource);
-      }
-
-      pushDebug(debugEntries, "critics", "Wine-Searcher browser", "matched", `Matched query "${buildCombinedQueryText(query)}".`);
-    }
-
-    if (!matched) {
-      pushDebug(debugEntries, "critics", "Wine-Searcher browser", "no_match", "No browser-rendered RP/JS scores were parsed.");
     }
   }
 

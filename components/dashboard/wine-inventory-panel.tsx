@@ -254,36 +254,19 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     });
   };
 
-  const summarizeDebug = (entries: EnrichmentDebugEntry[]) =>
-    entries
-      .map((entry) => `${entry.stage}: ${entry.source} - ${entry.status}. ${entry.detail}`)
-      .join(" | ");
-
   const buildNoScoreMessage = (entries: EnrichmentDebugEntry[]) => {
-    const hasConfiguredCriticSource = entries.some(
+    const hasConfiguredAutomaticSource = entries.some(
       (entry) =>
-        entry.stage === "critics" &&
-        entry.source !== "Public search fallback" &&
-        !/not configured/i.test(entry.detail)
+        (entry.stage === "critics" || entry.stage === "vivino") &&
+        !/not configured/i.test(entry.detail) &&
+        entry.status !== "skipped"
     );
 
-    if (!hasConfiguredCriticSource) {
-      return "No score source configured. Add Wine-Searcher or Global Wine Score API credentials in Vercel to enable automatic critic scores.";
+    if (!hasConfiguredAutomaticSource) {
+      return "No automatic score source configured. Add a Global Wine Score API connection, or use the manual RP/JS fields.";
     }
 
-    const condensedEntries = entries.filter((entry) => {
-      if (entry.stage === "metadata") {
-        return false;
-      }
-
-      if (entry.stage === "vivino" && /no vivino score was found/i.test(entry.detail)) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return condensedEntries.length > 0 ? `No scores found. ${summarizeDebug(condensedEntries)}` : "No scores found.";
+    return "No scores found from the currently configured automatic sources. You can enter RP/JS manually.";
   };
 
   const setWineStatus = (wineId: string, message: string | null) => {
@@ -610,7 +593,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         const message = payload.error ?? "Unable to refresh external scores for this wine.";
         setStatusMessage(message);
         setWineStatus(wine.id, message);
-        window.alert(message);
         return;
       }
 
@@ -630,7 +612,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         const message = buildNoScoreMessage(payload.debug);
         setStatusMessage(message);
         setWineStatus(wine.id, message);
-        window.alert(message);
       } else if (payload.data) {
         const badges = [
           payload.data.vivinoScore > 0 ? `Vivino ${payload.data.vivinoScore.toFixed(1)}` : "",
@@ -641,9 +622,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         const message = badges.length > 0 ? `Scores updated: ${badges.join(" | ")}` : "Refresh completed.";
         setStatusMessage(message);
         setWineStatus(wine.id, message);
-        if (!badges.length) {
-          window.alert(message);
-        }
       }
 
       await loadWines();
