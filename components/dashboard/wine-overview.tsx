@@ -7,7 +7,7 @@ import { KpiCard } from "@/components/cards/kpi-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWineDisplayTitle, hasVintageInWineName } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
-import { getPrimaryCellarScore, getPrimaryCellarScoreLabel } from "@/lib/wine-score";
+import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 
@@ -64,10 +64,8 @@ export function WineOverview() {
     const readyBottleCount = cellarWines.filter((wine) => wine.readiness !== "Hold").reduce((sum, wine) => sum + wine.quantity, 0);
     const peakBottleCount = cellarWines.filter((wine) => wine.readiness === "Peak").reduce((sum, wine) => sum + wine.quantity, 0);
     const scoredWines = cellarWines
-      .map((wine) => ({ wine, score: getPrimaryCellarScore(wine) }))
+      .map((wine) => ({ wine, score: getVivinoPortfolioScore(wine) }))
       .filter((entry) => entry.score !== null) as Array<{ wine: WineBottle; score: number }>;
-    const criticScoredCount = cellarWines.filter((wine) => getPrimaryCellarScoreLabel(wine) === "Critics").length;
-    const vivinoScoredCount = cellarWines.filter((wine) => getPrimaryCellarScoreLabel(wine) === "Vivino").length;
 
     return {
       totalBottles: totalBottleCount,
@@ -80,12 +78,7 @@ export function WineOverview() {
       averageScore: scoredWines.length
         ? (scoredWines.reduce((sum, entry) => sum + entry.score, 0) / scoredWines.length).toFixed(2)
         : "0.00",
-      averageScoreLabel:
-        criticScoredCount > 0
-          ? "Average critic-first score across tracked bottles."
-          : vivinoScoredCount > 0
-            ? "Average community score across tracked bottles."
-            : "No external scores available yet.",
+      averageScoreLabel: scoredWines.length > 0 ? "Average Vivino score across tracked bottles." : "No Vivino scores available yet.",
       totalCapacity: locations.reduce((sum, location) => sum + location.capacity, 0),
       totalOccupied: totalBottleCount
     };

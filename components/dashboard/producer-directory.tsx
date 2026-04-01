@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { NativeSelect } from "@/components/ui/native-select";
 import { getWineDisplayName } from "@/lib/wine-display";
-import { getPrimaryCellarScore } from "@/lib/wine-score";
+import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type WineBottle } from "@/lib/wine-data";
 
@@ -160,12 +160,12 @@ export function ProducerDirectory() {
         regions: [...value.regions],
         averageScore:
           value.wines
-            .map((wine) => getPrimaryCellarScore(wine))
+            .map((wine) => getVivinoPortfolioScore(wine))
             .filter((score): score is number => score !== null)
             .reduce((sum, score) => sum + score, 0) /
             Math.max(
               1,
-              value.wines.map((wine) => getPrimaryCellarScore(wine)).filter((score): score is number => score !== null).length
+              value.wines.map((wine) => getVivinoPortfolioScore(wine)).filter((score): score is number => score !== null).length
             )
       })),
     [filteredWines]

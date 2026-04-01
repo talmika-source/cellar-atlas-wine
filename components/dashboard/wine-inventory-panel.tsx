@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/utils";
 import { getWineDisplayTitle } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
-import { getPrimaryCellarScore, getPrimaryCellarScoreLabel } from "@/lib/wine-score";
+import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 import { inferReadinessFromVintage } from "@/lib/wine-readiness";
 import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
@@ -366,12 +366,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const totalBottles = filteredCellarWines.reduce((sum, wine) => sum + wine.quantity, 0);
   const currentValue = filteredCellarWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
   const scoredWines = filteredCellarWines
-    .map((wine) => getPrimaryCellarScore(wine))
+    .map((wine) => getVivinoPortfolioScore(wine))
     .filter((score): score is number => score !== null);
   const averageScore = scoredWines.length > 0 ? scoredWines.reduce((sum, score) => sum + score, 0) / scoredWines.length : 0;
-  const averageScoreLabel = filteredCellarWines.some((wine) => getPrimaryCellarScoreLabel(wine) === "Critics")
-    ? "Critic-first average across visible labels"
-    : "Vivino average across visible labels";
+  const averageScoreLabel = scoredWines.length > 0 ? "Vivino average across visible labels" : "No Vivino scores available in this view";
   const readyCount = filteredCellarWines.filter((wine) => wine.readiness !== "Hold").length;
 
   const updateForm = (key: keyof WineFormState, value: string) => {

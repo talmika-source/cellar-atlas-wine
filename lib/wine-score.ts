@@ -14,6 +14,10 @@ export function getCriticAverageScore(wine: Pick<WineBottle, "robertParkerScore"
   return roundToTenth(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+export function getVivinoPortfolioScore(wine: Pick<WineBottle, "vivinoScore">) {
+  return wine.vivinoScore > 0 ? roundToTenth(wine.vivinoScore) : null;
+}
+
 export function getPrimaryCellarScore(wine: Pick<WineBottle, "vivinoScore" | "robertParkerScore" | "jamesSucklingScore">) {
   const criticAverage = getCriticAverageScore(wine);
 
