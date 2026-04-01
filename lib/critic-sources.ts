@@ -594,19 +594,25 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
     }
   }
 
+  const headers: Record<string, string> = {
+    Accept: "application/json"
+  };
+
+  if (source.host) {
+    headers["X-RapidAPI-Host"] = source.host;
+    headers["X-RapidAPI-Key"] = source.apiKey;
+  } else {
+    headers.Authorization = `Bearer ${source.apiKey}`;
+    headers["X-API-Key"] = source.apiKey;
+  }
+
   const response = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${source.apiKey}`,
-      "X-API-Key": source.apiKey,
-      ...(source.host ? { "X-RapidAPI-Host": source.host } : {}),
-      ...(source.apiKey && source.host ? { "X-RapidAPI-Key": source.apiKey } : {}),
-      Accept: "application/json"
-    },
+    headers,
     cache: "no-store"
   });
 
   if (!response.ok) {
-    return null;
+    throw new Error(`HTTP ${response.status}`);
   }
 
   const payload = (await response.json()) as unknown;
@@ -655,17 +661,25 @@ async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQu
     url.searchParams.set("country", asciiLookupText(query.country) || query.country);
   }
 
+  const headers: Record<string, string> = {
+    Accept: "application/json"
+  };
+
+  if (source.host && source.apiKey) {
+    headers["X-RapidAPI-Host"] = source.host;
+    headers["X-RapidAPI-Key"] = source.apiKey;
+  } else if (source.apiKey) {
+    headers.Authorization = `Bearer ${source.apiKey}`;
+    headers["X-API-Key"] = source.apiKey;
+  }
+
   const response = await fetch(url.toString(), {
-    headers: {
-      ...(source.apiKey ? { Authorization: `Bearer ${source.apiKey}`, "X-API-Key": source.apiKey } : {}),
-      ...(source.host && source.apiKey ? { "X-RapidAPI-Host": source.host, "X-RapidAPI-Key": source.apiKey } : {}),
-      Accept: "application/json"
-    },
+    headers,
     cache: "no-store"
   });
 
   if (!response.ok) {
-    return null;
+    throw new Error(`HTTP ${response.status}`);
   }
 
   const payload = (await response.json()) as unknown;
