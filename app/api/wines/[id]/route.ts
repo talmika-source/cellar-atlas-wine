@@ -29,14 +29,22 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
   }
 
+  const hasManualCriticScores =
+    (partialPatch.robertParkerScore ?? currentWine.robertParkerScore ?? 0) > 0 ||
+    (partialPatch.jamesSucklingScore ?? currentWine.jamesSucklingScore ?? 0) > 0;
+
+  const shouldEnrich =
+    !hasManualCriticScores &&
+    (partialPatch.wineName !== undefined ||
+      partialPatch.producer !== undefined ||
+      partialPatch.region !== undefined ||
+      partialPatch.country !== undefined ||
+      partialPatch.grape !== undefined ||
+      partialPatch.vintage !== undefined ||
+      partialPatch.vivinoLink !== undefined);
+
   const vivinoAwarePatch =
-    partialPatch.wineName !== undefined ||
-    partialPatch.producer !== undefined ||
-    partialPatch.region !== undefined ||
-    partialPatch.country !== undefined ||
-    partialPatch.grape !== undefined ||
-    partialPatch.vintage !== undefined ||
-    partialPatch.vivinoLink !== undefined
+    shouldEnrich
       ? await enrichWineWithExternalScores({
           wineName: partialPatch.wineName ?? currentWine.wineName,
           producer: partialPatch.producer ?? currentWine.producer,
@@ -80,7 +88,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           cellarStatus: partialPatch.cellarStatus ?? currentWine.cellarStatus ?? "Cellar",
           drankOn: partialPatch.drankOn ?? currentWine.drankOn ?? ""
         } satisfies WineInput, { deepCriticLookup: false })
-      : partialPatch;
+      : {
+          ...partialPatch,
+          ...(hasManualCriticScores && partialPatch.criticSource === undefined && !currentWine.criticSource
+            ? { criticSource: "Manual" }
+            : {})
+        };
 
   const wine = await updateWine(params.id, vivinoAwarePatch);
 

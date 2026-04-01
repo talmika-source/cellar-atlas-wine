@@ -259,6 +259,33 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       .map((entry) => `${entry.stage}: ${entry.source} - ${entry.status}. ${entry.detail}`)
       .join(" | ");
 
+  const buildNoScoreMessage = (entries: EnrichmentDebugEntry[]) => {
+    const hasConfiguredCriticSource = entries.some(
+      (entry) =>
+        entry.stage === "critics" &&
+        entry.source !== "Public search fallback" &&
+        !/not configured/i.test(entry.detail)
+    );
+
+    if (!hasConfiguredCriticSource) {
+      return "No score source configured. Add Wine-Searcher or Global Wine Score API credentials in Vercel to enable automatic critic scores.";
+    }
+
+    const condensedEntries = entries.filter((entry) => {
+      if (entry.stage === "metadata") {
+        return false;
+      }
+
+      if (entry.stage === "vivino" && /no vivino score was found/i.test(entry.detail)) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return condensedEntries.length > 0 ? `No scores found. ${summarizeDebug(condensedEntries)}` : "No scores found.";
+  };
+
   const setWineStatus = (wineId: string, message: string | null) => {
     setWineStatusById((current) => {
       const next = { ...current };
@@ -441,6 +468,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     setError(null);
     setStatusMessage(null);
     startTransition(async () => {
+      const hasManualCriticScores = Number(form.robertParkerScore || 0) > 0 || Number(form.jamesSucklingScore || 0) > 0;
       const response = await fetch(editingWine ? `/api/wines/${editingWine.id}` : "/api/wines", {
         method: editingWine ? "PATCH" : "POST",
         headers: {
@@ -463,7 +491,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           vivinoScore: Number(form.vivinoScore || 0),
           robertParkerScore: Number(form.robertParkerScore || 0),
           jamesSucklingScore: Number(form.jamesSucklingScore || 0),
-          criticSource: form.criticSource,
+          criticSource: form.criticSource || (hasManualCriticScores ? "Manual" : ""),
           locationId: form.locationId,
           shelf: form.shelf,
           slot: form.slot,
@@ -488,7 +516,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setDialogOpen(false);
       resetForm();
 
-      if (savedWine) {
+      if (savedWine && !hasManualCriticScores) {
         void (async () => {
           const enrichResponse = await fetch(`/api/wines/${savedWine.id}/enrich`, {
             method: "POST"
@@ -508,7 +536,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               enrichPayload.data.jamesSucklingScore <= 0 &&
               enrichPayload.debug?.length
             ) {
-              setStatusMessage(`No scores found. ${summarizeDebug(enrichPayload.debug)}`);
+              setStatusMessage(buildNoScoreMessage(enrichPayload.debug));
             }
 
             await loadWines();
@@ -520,6 +548,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
             setError(enrichPayload.error);
           }
         })();
+      } else if (savedWine && hasManualCriticScores) {
+        setStatusMessage("Wine saved with manual critic scores.");
       }
     });
   };
@@ -597,7 +627,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         payload.data.jamesSucklingScore <= 0 &&
         payload.debug?.length
       ) {
-        const message = `No scores found. ${summarizeDebug(payload.debug)}`;
+        const message = buildNoScoreMessage(payload.debug);
         setStatusMessage(message);
         setWineStatus(wine.id, message);
         window.alert(message);
@@ -819,6 +849,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
             <div className="grid gap-3 md:grid-cols-2">
               <Input placeholder="Vivino link" value={form.vivinoLink} onChange={(event) => updateForm("vivinoLink", event.target.value)} />
               <Input placeholder="Vivino score" value={form.vivinoScore} onChange={(event) => updateForm("vivinoScore", event.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Manual critic override</p>
+              <p className="text-xs text-muted-foreground">
+                Fill Robert Parker or James Suckling here when automatic refresh fails. Manual critic scores are preserved and not overwritten on save.
+              </p>
             </div>
             <div className="grid gap-3 md:grid-cols-3">
               <Input

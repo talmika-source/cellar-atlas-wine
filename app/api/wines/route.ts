@@ -24,10 +24,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Selected location was not found." }, { status: 400 });
     }
 
-    const enrichedInput = await enrichWineWithExternalScores({
+    const hasManualCriticScores = (validatedInput.robertParkerScore ?? 0) > 0 || (validatedInput.jamesSucklingScore ?? 0) > 0;
+
+    const baseInput = {
       ...validatedInput,
-      vivinoLink: validatedInput.vivinoLink || buildVivinoSearchUrl(validatedInput)
-    }, { deepCriticLookup: false });
+      vivinoLink: validatedInput.vivinoLink || buildVivinoSearchUrl(validatedInput),
+      criticSource:
+        hasManualCriticScores && !validatedInput.criticSource.trim()
+          ? "Manual"
+          : validatedInput.criticSource
+    };
+
+    const enrichedInput = hasManualCriticScores
+      ? baseInput
+      : await enrichWineWithExternalScores(baseInput, { deepCriticLookup: false });
 
     const wine = await createWine(enrichedInput);
 
