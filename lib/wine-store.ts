@@ -352,7 +352,10 @@ function parseVivinoScore(html: string) {
     /ratings_average":(\d+(?:\.\d+)?)/i,
     /average_rating":(\d+(?:\.\d+)?)/i,
     /"averageRating"\s*:\s*(\d+(?:\.\d+)?)/i,
-    />\s*(\d\.\d)\s*<\/span>\s*<span[^>]*>\s*\d[\d,]*\s+ratings/i
+    />\s*(\d\.\d)\s*<\/span>\s*<span[^>]*>\s*\d[\d,]*\s+ratings/i,
+    /\b([3-5]\.\d)\s+count ratings\b/i,
+    /\b([3-5]\.\d)\s+\d[\d,]*\s+ratings\b/i,
+    /\b([3-5]\.\d)\s+ratings\b/i
   ];
 
   for (const pattern of patterns) {
