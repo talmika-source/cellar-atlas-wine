@@ -221,6 +221,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [wineStatusById, setWineStatusById] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
   const normalizedQuery = query.trim().toLowerCase();
 
@@ -258,6 +259,20 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       .slice(0, 6)
       .map((entry) => `${entry.stage}: ${entry.source} - ${entry.status}. ${entry.detail}`)
       .join(" | ");
+
+  const setWineStatus = (wineId: string, message: string | null) => {
+    setWineStatusById((current) => {
+      const next = { ...current };
+
+      if (!message) {
+        delete next[wineId];
+        return next;
+      }
+
+      next[wineId] = message;
+      return next;
+    });
+  };
 
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
@@ -563,7 +578,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
 
       if (!response.ok) {
         const payload = await readResponsePayload<{ error?: string }>(response);
-        setStatusMessage(payload.error ?? "Unable to refresh external scores for this wine.");
+        const message = payload.error ?? "Unable to refresh external scores for this wine.";
+        setStatusMessage(message);
+        setWineStatus(wine.id, message);
+        window.alert(message);
         return;
       }
 
@@ -580,7 +598,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         payload.data.jamesSucklingScore <= 0 &&
         payload.debug?.length
       ) {
-        setStatusMessage(`No scores found. ${summarizeDebug(payload.debug)}`);
+        const message = `No scores found. ${summarizeDebug(payload.debug)}`;
+        setStatusMessage(message);
+        setWineStatus(wine.id, message);
+        window.alert(message);
       } else if (payload.data) {
         const badges = [
           payload.data.vivinoScore > 0 ? `Vivino ${payload.data.vivinoScore.toFixed(1)}` : "",
@@ -588,7 +609,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           payload.data.jamesSucklingScore > 0 ? `JS ${payload.data.jamesSucklingScore}` : ""
         ].filter(Boolean);
 
-        setStatusMessage(badges.length > 0 ? `Scores updated: ${badges.join(" | ")}` : "Refresh completed.");
+        const message = badges.length > 0 ? `Scores updated: ${badges.join(" | ")}` : "Refresh completed.";
+        setStatusMessage(message);
+        setWineStatus(wine.id, message);
+        if (!badges.length) {
+          window.alert(message);
+        }
       }
 
       await loadWines();
@@ -937,6 +963,11 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                 </div>
 
                 <p className="text-sm text-muted-foreground">{wine.notes}</p>
+                {wineStatusById[wine.id] ? (
+                  <div className="rounded-2xl border border-border/80 bg-secondary/40 px-4 py-3 text-sm text-foreground">
+                    {wineStatusById[wine.id]}
+                  </div>
+                ) : null}
 
                 <div className="flex flex-wrap items-center gap-3">
                   {isCellarWine(wine) ? (
