@@ -361,11 +361,8 @@ async function fetchVivinoScoreFromApify(url: string) {
   endpoint.searchParams.set("timeout", "120");
   const input = {
     wineUrls: [baseWineUrl],
-    urls: [baseWineUrl],
-    startUrls: [{ url: baseWineUrl }],
     onlyValidRatings: false,
-    delayBetweenRequests: 1000,
-    debug: true
+    delayBetweenRequests: 1000
   };
 
   const response = await fetch(endpoint.toString(), {
