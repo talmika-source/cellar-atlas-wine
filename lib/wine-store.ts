@@ -26,7 +26,7 @@ export class ExternalScoringUnavailableError extends Error {
   }
 }
 
-const DEFAULT_APIFY_VIVINO_ACTOR = "mrbridge~vivino-ratings-scraper-from-url-list";
+const DEFAULT_APIFY_VIVINO_ACTOR = "mrbridge~vivino-ratings-scraper-with-vintages-from-url-list";
 
 function pushDebug(
   entries: EnrichmentDebugEntry[] | undefined,
@@ -277,12 +277,24 @@ function normalizeApifyActorId(value: string) {
   return value.trim().replace(/\//g, "~");
 }
 
-function extractApifyVivinoScore(payload: unknown) {
+function getVivinoUrlYear(url: string) {
+  try {
+    const parsed = new URL(url);
+    const year = parsed.searchParams.get("year");
+    return year && /^\d{4}$/.test(year) ? Number(year) : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractApifyVivinoScore(payload: unknown, url: string) {
   if (!payload) {
     return null;
   }
 
   const items = Array.isArray(payload) ? payload : [payload];
+  const targetYear = getVivinoUrlYear(url);
+  let fallbackScore: number | null = null;
 
   for (const item of items) {
     if (!item || typeof item !== "object") {
@@ -290,25 +302,36 @@ function extractApifyVivinoScore(payload: unknown) {
     }
 
     const record = item as Record<string, unknown>;
+    const vintage = typeof record.vintage === "number" ? record.vintage : typeof record.vintage === "string" ? Number(record.vintage) : null;
 
-    for (const key of ["rating", "score", "averageRating", "ratings_average", "vivinoScore"]) {
+    for (const key of ["rating", "score", "averageRating", "ratings_average", "vivinoScore", "overallRating"]) {
       const value = record[key];
 
       if (typeof value === "number" && Number.isFinite(value) && value > 0) {
-        return value;
+        if (targetYear && vintage === targetYear) {
+          return value;
+        }
+
+        fallbackScore ??= value;
       }
 
       if (typeof value === "string") {
         const match = value.match(/\b([3-5]\.\d)\b/);
 
         if (match) {
-          return Number(match[1]);
+          const parsed = Number(match[1]);
+
+          if (targetYear && vintage === targetYear) {
+            return parsed;
+          }
+
+          fallbackScore ??= parsed;
         }
       }
     }
   }
 
-  return null;
+  return fallbackScore;
 }
 
 async function fetchVivinoScoreFromApify(url: string) {
@@ -323,7 +346,9 @@ async function fetchVivinoScoreFromApify(url: string) {
   const input = {
     wineUrls: [url],
     urls: [url],
-    startUrls: [{ url }]
+    startUrls: [{ url }],
+    onlyValidRatings: false,
+    delayBetweenRequests: 1000
   };
 
   const response = await fetch(endpoint, {
@@ -342,7 +367,7 @@ async function fetchVivinoScoreFromApify(url: string) {
   }
 
   const payload = (await response.json()) as unknown;
-  const score = extractApifyVivinoScore(payload);
+  const score = extractApifyVivinoScore(payload, url);
 
   if (!score) {
     return null;
