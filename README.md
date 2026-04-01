@@ -34,6 +34,8 @@ Important hosting note:
 Online scoring note:
 - For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
 - `DATABASE_URL` should point to your Postgres database.
+- `BRIGHTDATA_BROWSER_AUTH` or `BRIGHTDATA_BROWSER_USERNAME` + `BRIGHTDATA_BROWSER_PASSWORD` enables Bright Data as the primary managed browser for Vivino rendering.
+- `BRIGHTDATA_BROWSER_WS_ENDPOINT` can be used if Bright Data gives you a custom browser WebSocket endpoint.
 - `BROWSERLESS_API_TOKEN` lets the app render Vivino and Wine-Searcher pages online when plain fetches are blocked.
 - If Vivino is still blocked, set `BROWSERLESS_USE_RESIDENTIAL_PROXY=true`. You can also set `BROWSERLESS_PROXY_COUNTRY` if your Browserless plan supports it.
 - `WINE_SEARCHER_API_URL` + `WINE_SEARCHER_API_KEY` and `GLOBAL_WINE_SCORE_API_URL` + `GLOBAL_WINE_SCORE_API_KEY` are optional critic APIs that improve Robert Parker and James Suckling coverage.

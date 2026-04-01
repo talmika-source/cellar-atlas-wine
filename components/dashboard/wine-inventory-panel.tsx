@@ -816,8 +816,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           const location = locations.find((item) => item.id === wine.locationId);
           const headerMeta = [wine.vintage ? String(wine.vintage) : "", wine.region, wine.country].filter(Boolean).join(" • ");
           const placement = formatWinePlacement(wine.shelf, wine.slot);
-          const primaryScore = getPrimaryCellarScore(wine);
-          const primaryScoreLabel = getPrimaryCellarScoreLabel(wine);
 
           return (
             <Card key={wine.id}>
@@ -831,7 +829,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                   {wine.vivinoScore > 0 ? <Badge variant="info">{wine.vivinoScore.toFixed(1)} Vivino</Badge> : null}
                   {wine.robertParkerScore > 0 ? <Badge variant="warning">RP {wine.robertParkerScore}</Badge> : null}
                   {wine.jamesSucklingScore > 0 ? <Badge variant="warning">JS {wine.jamesSucklingScore}</Badge> : null}
-                  {primaryScore ? <Badge variant="success">{primaryScore.toFixed(1)} {primaryScoreLabel}</Badge> : null}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">

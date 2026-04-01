@@ -20,6 +20,52 @@ export type RenderedPageData = {
   scoreTexts: string[];
 };
 
+function getBrightDataAuth() {
+  const directAuth = process.env.BRIGHTDATA_BROWSER_AUTH?.trim();
+
+  if (directAuth) {
+    return directAuth;
+  }
+
+  const username = process.env.BRIGHTDATA_BROWSER_USERNAME?.trim();
+  const password = process.env.BRIGHTDATA_BROWSER_PASSWORD?.trim();
+
+  if (username && password) {
+    return `${username}:${password}`;
+  }
+
+  return null;
+}
+
+function buildBrightDataBrowserWSEndpoint() {
+  const explicitEndpoint = process.env.BRIGHTDATA_BROWSER_WS_ENDPOINT?.trim();
+
+  if (explicitEndpoint) {
+    return explicitEndpoint;
+  }
+
+  const auth = getBrightDataAuth();
+
+  if (!auth) {
+    return null;
+  }
+
+  if (/^wss?:\/\//i.test(auth)) {
+    return auth;
+  }
+
+  const separatorIndex = auth.indexOf(":");
+
+  if (separatorIndex === -1) {
+    return `wss://${encodeURIComponent(auth)}@brd.superproxy.io:9222`;
+  }
+
+  const username = auth.slice(0, separatorIndex);
+  const password = auth.slice(separatorIndex + 1);
+
+  return `wss://${encodeURIComponent(username)}:${encodeURIComponent(password)}@brd.superproxy.io:9222`;
+}
+
 function buildBrowserlessBaseUrl() {
   return (process.env.BROWSERLESS_BASE_URL?.trim() || "https://production-sfo.browserless.io").replace(/\/$/, "");
 }
@@ -102,6 +148,46 @@ async function fetchRenderedPageViaBrowserless(url: string) {
     bodyText,
     scoreTexts: extractScoreTexts(bodyText)
   } satisfies RenderedPageData;
+}
+
+async function fetchRenderedPageViaBrightData(url: string) {
+  const endpoint = buildBrightDataBrowserWSEndpoint();
+
+  if (!endpoint) {
+    return null;
+  }
+
+  let browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | null = null;
+
+  try {
+    browser = await chromium.connectOverCDP(endpoint);
+    const context = browser.contexts()[0] ?? (await browser.newContext());
+    const page = await context.newPage();
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 90000
+    });
+    await page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => undefined);
+    await page.waitForTimeout(8000);
+
+    const html = await page.content();
+    const bodyText = (await page.locator("body").innerText().catch(() => "")) || "";
+    const title = await page.title().catch(() => parseTitle(html));
+
+    return {
+      finalUrl: page.url(),
+      title,
+      html,
+      bodyText,
+      scoreTexts: extractScoreTexts(bodyText)
+    } satisfies RenderedPageData;
+  } catch {
+    return null;
+  } finally {
+    if (browser) {
+      await browser.close().catch(() => undefined);
+    }
+  }
 }
 
 function shouldTryBrowserlessUnblock(page: RenderedPageData | null) {
@@ -295,6 +381,12 @@ async function fetchRenderedPageViaLocalBrowser(url: string) {
 
 export async function fetchRenderedPage(url: string) {
   try {
+    const brightDataResult = await fetchRenderedPageViaBrightData(url);
+
+    if (brightDataResult) {
+      return brightDataResult;
+    }
+
     const browserlessResult = await fetchRenderedPageViaBrowserless(url);
 
     if (browserlessResult && !shouldTryBrowserlessUnblock(browserlessResult)) {
