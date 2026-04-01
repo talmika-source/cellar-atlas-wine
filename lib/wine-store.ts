@@ -639,13 +639,15 @@ export async function enrichWineWithVivino(input: WineInput) {
       }
     }
 
-    return {
-      ...input,
-      vivinoLink: resolvedVivinoLink,
-      vivinoScore: score ?? input.vivinoScore,
-      drinkWindow,
-      readiness
-    };
+    if (score) {
+      return {
+        ...input,
+        vivinoLink: resolvedVivinoLink,
+        vivinoScore: score,
+        drinkWindow,
+        readiness
+      };
+    }
   } catch {
     // Fall through to browser-based enrichment below.
   }
