@@ -287,6 +287,17 @@ function getVivinoUrlYear(url: string) {
   }
 }
 
+function getBaseVivinoWineUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function extractApifyVivinoScore(payload: unknown, url: string) {
   if (!payload) {
     return null;
@@ -343,15 +354,15 @@ async function fetchVivinoScoreFromApify(url: string) {
 
   const actorId = normalizeApifyActorId(process.env.APIFY_VIVINO_ACTOR_ID?.trim() || DEFAULT_APIFY_VIVINO_ACTOR);
   const targetYear = getVivinoUrlYear(url);
+  const baseWineUrl = getBaseVivinoWineUrl(url);
   const endpoint = new URL(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items`);
   endpoint.searchParams.set("token", token);
   endpoint.searchParams.set("memory", "256");
   endpoint.searchParams.set("timeout", "120");
   const input = {
-    wineUrls: [url],
-    urls: [url],
-    startUrls: [{ url }],
-    ...(targetYear ? { vintages: [targetYear] } : {}),
+    wineUrls: [baseWineUrl],
+    urls: [baseWineUrl],
+    startUrls: [{ url: baseWineUrl }],
     onlyValidRatings: false,
     delayBetweenRequests: 1000,
     debug: true
