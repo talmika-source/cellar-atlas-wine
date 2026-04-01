@@ -43,6 +43,8 @@ type CriticLookupQuery = {
   country?: string;
 };
 
+type ScoreLabel = "rp" | "js";
+
 function buildCombinedQueryText(query: CriticLookupQuery) {
   return [query.producer, query.wineName, query.vintage, query.region, query.country]
     .filter(Boolean)
@@ -315,6 +317,63 @@ function extractNumericScore(value: unknown) {
   return null;
 }
 
+function mapCriticLabel(value: string | null | undefined): ScoreLabel | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (/(robert.?parker|wine.?advocate|parker|\brp\b|\bwa\b)/i.test(normalized)) {
+    return "rp";
+  }
+
+  if (/(james.?suckling|suckling|\bjs\b)/i.test(normalized)) {
+    return "js";
+  }
+
+  return null;
+}
+
+function pickObjectString(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function pickObjectNumber(record: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    const score = extractNumericScore(record[key]);
+
+    if (score) {
+      return score;
+    }
+  }
+
+  return null;
+}
+
+function parseCriticObject(record: Record<string, unknown>) {
+  const label = mapCriticLabel(
+    pickObjectString(record, ["critic", "reviewer", "source", "name", "provider", "author", "criticName"])
+  );
+  const score = pickObjectNumber(record, ["score", "rating", "value", "points", "avg", "average", "ratingValue"]);
+
+  if (!label || !score) {
+    return null;
+  }
+
+  return label === "rp"
+    ? { robertParkerScore: score, jamesSucklingScore: null }
+    : { robertParkerScore: null, jamesSucklingScore: score };
+}
+
 function walkCriticPayload(value: unknown, trail = ""): CriticScores {
   if (Array.isArray(value)) {
     return value.reduce<CriticScores>((scores, item, index) => {
@@ -331,8 +390,12 @@ function walkCriticPayload(value: unknown, trail = ""): CriticScores {
   }
 
   const entries = Object.entries(value as Record<string, unknown>);
+  const objectScores = parseCriticObject(value as Record<string, unknown>);
   let robertParkerScore: number | null = null;
   let jamesSucklingScore: number | null = null;
+
+  robertParkerScore ||= objectScores?.robertParkerScore ?? null;
+  jamesSucklingScore ||= objectScores?.jamesSucklingScore ?? null;
 
   for (const [key, nestedValue] of entries) {
     const keyTrail = `${trail}.${key}`.toLowerCase();
@@ -435,17 +498,27 @@ async function fetchCriticSource(source: CandidateSource, query: CriticLookupQue
 
   const url = new URL(source.endpoint);
   const combinedQuery = buildCombinedQueryText(query);
+  const combinedName = [query.producer, query.wineName].filter(Boolean).join(" ").trim();
 
   if (/rapidapi/i.test(source.name) || source.host) {
     if (/wine_name=/i.test(url.pathname)) {
-      url.pathname = url.pathname.replace(/wine_name=[^/]+/i, `wine_name=${encodeURIComponent(combinedQuery || query.wineName)}`);
+      const encodedTerm = encodeURIComponent(combinedQuery || combinedName || query.wineName);
+      url.pathname = url.pathname.replace(/wine_name=[^/]+/i, `wine_name=${encodedTerm}`);
     } else if (!url.searchParams.has("wine_name")) {
-      url.searchParams.set("wine_name", combinedQuery || query.wineName);
+      url.searchParams.set("wine_name", combinedQuery || combinedName || query.wineName);
     }
+
+    url.searchParams.set("wineName", combinedName || query.wineName);
+    url.searchParams.set("producer", query.producer);
+    url.searchParams.set("vintage", query.vintage);
   } else {
     url.searchParams.set("wineName", query.wineName);
     url.searchParams.set("producer", query.producer);
     url.searchParams.set("vintage", query.vintage);
+    url.searchParams.set("q", combinedQuery);
+    url.searchParams.set("query", combinedQuery);
+    url.searchParams.set("search", combinedQuery);
+    url.searchParams.set("name", combinedName || query.wineName);
 
     if (query.region) {
       url.searchParams.set("region", query.region);
@@ -490,9 +563,16 @@ async function fetchMetadataSource(source: MetadataSource, query: CriticLookupQu
   }
 
   const url = new URL(source.endpoint);
+  const combinedQuery = buildCombinedQueryText(query);
+  const combinedName = [query.producer, query.wineName].filter(Boolean).join(" ").trim();
   url.searchParams.set("wineName", query.wineName);
   url.searchParams.set("producer", query.producer);
   url.searchParams.set("vintage", query.vintage);
+  url.searchParams.set("q", combinedQuery);
+  url.searchParams.set("query", combinedQuery);
+  url.searchParams.set("search", combinedQuery);
+  url.searchParams.set("name", combinedName || query.wineName);
+  url.searchParams.set("wine_name", combinedName || query.wineName);
 
   if (query.region) {
     url.searchParams.set("region", query.region);
