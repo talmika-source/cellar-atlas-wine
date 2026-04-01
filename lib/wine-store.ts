@@ -26,7 +26,10 @@ export class ExternalScoringUnavailableError extends Error {
   }
 }
 
-const DEFAULT_APIFY_VIVINO_ACTOR = "mrbridge~vivino-ratings-scraper-with-vintages-from-url-list";
+const DEFAULT_APIFY_VIVINO_ACTORS = [
+  "mrbridge~vivino-ratings-scraper-with-vintages-from-url-list",
+  "scrapmania~vivino-ratings-scraper-with-vintages-from-url-list"
+] as const;
 
 function pushDebug(
   entries: EnrichmentDebugEntry[] | undefined,
@@ -352,41 +355,58 @@ async function fetchVivinoScoreFromApify(url: string) {
     return null;
   }
 
-  const actorId = normalizeApifyActorId(process.env.APIFY_VIVINO_ACTOR_ID?.trim() || DEFAULT_APIFY_VIVINO_ACTOR);
+  const configuredActor = process.env.APIFY_VIVINO_ACTOR_ID?.trim();
+  const actorIds = Array.from(
+    new Set(
+      [configuredActor ? normalizeApifyActorId(configuredActor) : "", ...DEFAULT_APIFY_VIVINO_ACTORS].filter(Boolean)
+    )
+  );
   const targetYear = getVivinoUrlYear(url);
   const baseWineUrl = getBaseVivinoWineUrl(url);
-  const endpoint = new URL(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items`);
-  endpoint.searchParams.set("token", token);
-  endpoint.searchParams.set("memory", "256");
-  endpoint.searchParams.set("timeout", "120");
-  const input = {
-    wineUrls: [baseWineUrl],
-    onlyValidRatings: false,
-    delayBetweenRequests: 1000
-  };
+  let lastError = "Apify returned no usable response.";
 
-  const response = await fetch(endpoint.toString(), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json"
-    },
-    body: JSON.stringify(input),
-    cache: "no-store"
-  });
+  for (const actorId of actorIds) {
+    const endpoint = new URL(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items`);
+    endpoint.searchParams.set("token", token);
+    endpoint.searchParams.set("memory", "256");
+    endpoint.searchParams.set("timeout", "120");
+    const input = {
+      wineUrls: [baseWineUrl],
+      onlyValidRatings: false,
+      delayBetweenRequests: 1000
+    };
 
-  if (!response.ok) {
-    throw new Error(`Apify HTTP ${response.status}`);
-  }
+    const response = await fetch(endpoint.toString(), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify(input),
+      cache: "no-store"
+    });
 
-  const payload = (await response.json()) as unknown;
-  const score = extractApifyVivinoScore(payload, url);
+    if (!response.ok) {
+      lastError = `Apify actor ${actorId} HTTP ${response.status}`;
 
-  if (!score) {
+      if (response.status === 404) {
+        continue;
+      }
+
+      throw new Error(lastError);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const score = extractApifyVivinoScore(payload, url);
+
+    if (score) {
+      return score;
+    }
+
     return null;
   }
 
-  return score;
+  throw new Error(lastError);
 }
 
 function scoreNameMatch(candidateName: string, query: string) {
