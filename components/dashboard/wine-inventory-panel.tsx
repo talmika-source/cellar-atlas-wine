@@ -236,6 +236,21 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     }
   };
 
+  const mergeWineIntoState = (updatedWine: WineBottle) => {
+    setWines((current) => {
+      const next = [...current];
+      const index = next.findIndex((wine) => wine.id === updatedWine.id);
+
+      if (index === -1) {
+        next.unshift(updatedWine);
+        return next;
+      }
+
+      next[index] = updatedWine;
+      return next;
+    });
+  };
+
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
     const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
@@ -454,6 +469,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           });
 
           if (enrichResponse.ok) {
+            const enrichPayload = await readResponsePayload<{ data?: WineBottle }>(enrichResponse);
+
+            if (enrichPayload.data) {
+              mergeWineIntoState(enrichPayload.data);
+            }
+
             await loadWines();
             return;
           }
@@ -519,6 +540,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         const payload = await readResponsePayload<{ error?: string }>(response);
         setError(payload.error ?? "Unable to refresh external scores for this wine.");
         return;
+      }
+
+      const payload = await readResponsePayload<{ data?: WineBottle }>(response);
+
+      if (payload.data) {
+        mergeWineIntoState(payload.data);
       }
 
       await loadWines();
