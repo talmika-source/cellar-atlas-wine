@@ -73,22 +73,10 @@ function buildCombinedQueryText(query: CriticLookupQuery) {
 
 const candidateSources: CandidateSource[] = [
   {
-    name: "RapidAPI Wine Explorer",
-    endpoint: process.env.RAPIDAPI_WINE_API_URL,
-    apiKey: process.env.RAPIDAPI_WINE_API_KEY,
-    host: process.env.RAPIDAPI_WINE_API_HOST
-  },
-  {
     name: "RapidAPI Global Wine Score",
     endpoint: process.env.RAPIDAPI_GLOBAL_WINE_SCORE_URL,
     apiKey: process.env.RAPIDAPI_GLOBAL_WINE_SCORE_KEY || process.env.RAPIDAPI_GLOBAL_WINE_SCORE_API_KEY,
     host: process.env.RAPIDAPI_GLOBAL_WINE_SCORE_HOST
-  },
-  {
-    name: "RapidAPI VinHub",
-    endpoint: process.env.RAPIDAPI_VINHUB_URL,
-    apiKey: process.env.RAPIDAPI_VINHUB_KEY || process.env.RAPIDAPI_VINHUB_API_KEY,
-    host: process.env.RAPIDAPI_VINHUB_HOST
   },
   {
     name: "Wine-Searcher",

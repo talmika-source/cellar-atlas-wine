@@ -401,34 +401,57 @@ function stripHtml(value: string) {
     .trim();
 }
 
-async function fetchVivinoSearchSnippetScore(input: WineInput) {
-  const query = [input.producer, input.wineName, input.vintage ? String(input.vintage) : "", "site:vivino.com"]
-    .filter(Boolean)
-    .join(" ")
+function normalizeSearchSnippetText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[’']/g, "")
+    .replace(/[^a-zA-Z0-9\s:/?&.=+-]/g, " ")
+    .replace(/\s+/g, " ")
     .trim();
+}
 
-  if (!query) {
-    return null;
-  }
+async function fetchVivinoSearchSnippetScore(input: WineInput) {
+  const queries = Array.from(
+    new Set(
+      [
+        [input.producer, input.wineName, input.vintage ? String(input.vintage) : "", "site:vivino.com"].filter(Boolean).join(" ").trim(),
+        [normalizeSearchSnippetText(input.producer), normalizeSearchSnippetText(input.wineName), input.vintage ? String(input.vintage) : "", "site:vivino.com"]
+          .filter(Boolean)
+          .join(" ")
+          .trim(),
+        input.vivinoLink?.trim() ? `"${input.vivinoLink.trim()}"` : "",
+        input.vivinoLink?.trim() ? `${normalizeSearchSnippetText(input.vivinoLink)} site:vivino.com` : ""
+      ].filter(Boolean)
+    )
+  );
 
-  try {
-    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 CellarAtlas/1.0"
-      },
-      cache: "no-store"
-    });
+  for (const query of queries) {
+    try {
+      const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 CellarAtlas/1.0"
+        },
+        cache: "no-store"
+      });
 
-    if (!response.ok) {
-      return null;
+      if (!response.ok) {
+        continue;
+      }
+
+      const html = await response.text();
+      const text = stripHtml(html);
+      const score = parseVivinoScore(text);
+
+      if (score) {
+        return score;
+      }
+    } catch {
+      // Try the next query variant.
     }
-
-    const html = await response.text();
-    const text = stripHtml(html);
-    return parseVivinoScore(text);
-  } catch {
-    return null;
   }
+
+  return null;
 }
 
 function parseDrinkingWindow(html: string) {
