@@ -653,22 +653,44 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: () => 
   ]);
 }
 
+function mergeEnrichmentResults(base: WineInput, criticResult: WineInput, vivinoResult: WineInput) {
+  return {
+    ...base,
+    ...criticResult,
+    vivinoLink: vivinoResult.vivinoLink || criticResult.vivinoLink || base.vivinoLink,
+    vivinoScore: vivinoResult.vivinoScore || criticResult.vivinoScore || base.vivinoScore,
+    drinkWindow: vivinoResult.drinkWindow || criticResult.drinkWindow || base.drinkWindow,
+    readiness: vivinoResult.readiness || criticResult.readiness || base.readiness,
+    robertParkerScore: criticResult.robertParkerScore || vivinoResult.robertParkerScore || base.robertParkerScore,
+    jamesSucklingScore: criticResult.jamesSucklingScore || vivinoResult.jamesSucklingScore || base.jamesSucklingScore,
+    criticSource: criticResult.criticSource || vivinoResult.criticSource || base.criticSource
+  };
+}
+
 export async function enrichWineWithExternalScores(input: WineInput, options: EnrichmentOptions = {}) {
-  const withCritics = await withTimeout(
+  const criticTimeoutMs = options.deepCriticLookup ? 12000 : 3500;
+  const vivinoTimeoutMs = options.deepCriticLookup ? 10000 : 2500;
+  const criticPromise = withTimeout(
     enrichWineWithCriticScores(input, { includeBrowserFallback: options.deepCriticLookup }),
-    options.deepCriticLookup ? 45000 : 12000,
+    criticTimeoutMs,
     () => input
   );
+  const vivinoPromise =
+    input.vivinoLink?.trim() || buildVivinoSearchUrl(input)
+      ? withTimeout(
+          enrichWineWithVivino(input),
+          vivinoTimeoutMs,
+          () => input
+        )
+      : Promise.resolve(input);
 
-  if (!withCritics.vivinoLink?.trim() && !input.vivinoLink?.trim()) {
-    return withCritics;
-  }
+  const [criticResult, vivinoResult] = await Promise.allSettled([criticPromise, vivinoPromise]);
 
-  try {
-    return await enrichWineWithVivino(withCritics);
-  } catch {
-    return withCritics;
-  }
+  return mergeEnrichmentResults(
+    input,
+    criticResult.status === "fulfilled" ? criticResult.value : input,
+    vivinoResult.status === "fulfilled" ? vivinoResult.value : input
+  );
 }
 
 function extractVintage(text: string) {

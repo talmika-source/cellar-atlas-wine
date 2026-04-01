@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const enrichedInput = await enrichWineWithExternalScores({
       ...validatedInput,
       vivinoLink: validatedInput.vivinoLink || buildVivinoSearchUrl(validatedInput)
-    }, { deepCriticLookup: true });
+    }, { deepCriticLookup: false });
 
     const wine = await createWine(enrichedInput);
 
