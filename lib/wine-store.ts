@@ -342,19 +342,24 @@ async function fetchVivinoScoreFromApify(url: string) {
   }
 
   const actorId = normalizeApifyActorId(process.env.APIFY_VIVINO_ACTOR_ID?.trim() || DEFAULT_APIFY_VIVINO_ACTOR);
-  const endpoint = `https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items?memory=256&timeout=120`;
+  const targetYear = getVivinoUrlYear(url);
+  const endpoint = new URL(`https://api.apify.com/v2/acts/${actorId}/run-sync-get-dataset-items`);
+  endpoint.searchParams.set("token", token);
+  endpoint.searchParams.set("memory", "256");
+  endpoint.searchParams.set("timeout", "120");
   const input = {
     wineUrls: [url],
     urls: [url],
     startUrls: [{ url }],
+    ...(targetYear ? { vintages: [targetYear] } : {}),
     onlyValidRatings: false,
-    delayBetweenRequests: 1000
+    delayBetweenRequests: 1000,
+    debug: true
   };
 
-  const response = await fetch(endpoint, {
+  const response = await fetch(endpoint.toString(), {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
       Accept: "application/json"
     },
