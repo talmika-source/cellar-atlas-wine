@@ -630,13 +630,28 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
 
   const loadWines = async () => {
     const response = await fetch("/api/wines", { cache: "no-store" });
-    const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
+    const payload = await readResponsePayload<{ data?: WineBottle[]; error?: string }>(response);
+
+    if (!response.ok) {
+      setError(payload.error ?? "Unable to load wines.");
+      setWines([]);
+      return;
+    }
+
+    setError(null);
     setWines(payload.data ?? []);
   };
 
   const loadLocations = async () => {
     const response = await fetch("/api/locations", { cache: "no-store" });
-    const payload = response.ok ? await readResponsePayload<{ data?: StorageLocation[] }>(response) : {};
+    const payload = await readResponsePayload<{ data?: StorageLocation[]; error?: string }>(response);
+
+    if (!response.ok) {
+      setError((current) => current ?? payload.error ?? "Unable to load storage locations.");
+      setLocations([]);
+      return;
+    }
+
     const nextLocations = payload.data ?? [];
     setLocations(nextLocations);
 
@@ -1136,6 +1151,12 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
           Add Wine
         </Button>
       </div>
+
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
 
       <Card>
         <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">

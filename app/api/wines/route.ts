@@ -5,7 +5,14 @@ import { getLocation } from "@/lib/locations-store";
 import { type ValidatedWineInput, validateWineInput } from "@/lib/wine-validation";
 
 export async function GET() {
-  return NextResponse.json({ data: await listWines() });
+  try {
+    return NextResponse.json({ data: await listWines() });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unable to load wines." },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {
