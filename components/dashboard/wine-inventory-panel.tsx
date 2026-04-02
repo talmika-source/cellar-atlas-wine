@@ -705,14 +705,32 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
 
   const visibleWines = inventoryTab === "cellar" ? filteredCellarWines : filteredDrankWines;
 
-  const totalBottles = filteredCellarWines.reduce((sum, wine) => sum + wine.quantity, 0);
-  const currentValue = filteredCellarWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
-  const scoredWines = filteredCellarWines
+  const analyticsWines = inventoryTab === "cellar" ? filteredCellarWines : filteredDrankWines;
+  const totalBottles = analyticsWines.reduce((sum, wine) => sum + wine.quantity, 0);
+  const currentValue = analyticsWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
+  const scoredWines = analyticsWines
     .map((wine) => getVivinoPortfolioScore(wine))
     .filter((score): score is number => score !== null);
   const averageScore = scoredWines.length > 0 ? scoredWines.reduce((sum, score) => sum + score, 0) / scoredWines.length : 0;
-  const averageScoreLabel = scoredWines.length > 0 ? "Vivino average across visible labels" : "No Vivino scores available in this view";
-  const readyCount = filteredCellarWines.filter((wine) => wine.readiness !== "Hold").length;
+  const averageScoreLabel =
+    scoredWines.length > 0
+      ? `Vivino average across visible ${inventoryTab === "cellar" ? "cellar" : "drank"} labels`
+      : `No Vivino scores available in this ${inventoryTab === "cellar" ? "cellar" : "drank"} view`;
+  const readyCount = analyticsWines.filter((wine) => wine.readiness !== "Hold").length;
+  const kpiLabels =
+    inventoryTab === "cellar"
+      ? {
+          bottles: "Filtered Bottles",
+          value: "Inventory Value",
+          score: "Average Score",
+          readiness: "Ready Or Peak"
+        }
+      : {
+          bottles: "Drank Filtered Bottles",
+          value: "Drank Value",
+          score: "Drank Average Score",
+          readiness: "Drank Ready Or Peak"
+        };
 
   const updateForm = (key: keyof WineFormState, value: string) => {
     setForm((current) => ({
@@ -1144,10 +1162,24 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
       </Card>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <KpiCard label="Filtered Bottles" value={String(totalBottles)} trend={`${filteredCellarWines.length} active wine entries in view`} />
-        <KpiCard label="Inventory Value" value={formatCurrency(currentValue)} trend="Estimated current cellar value" tone="success" />
-        <KpiCard label="Average Score" value={averageScore.toFixed(2)} trend={averageScoreLabel} tone="warning" />
-        <KpiCard label="Ready Or Peak" value={String(readyCount)} trend="Bottles suitable for near-term service" tone="danger" />
+        <KpiCard
+          label={kpiLabels.bottles}
+          value={String(totalBottles)}
+          trend={`${analyticsWines.length} ${inventoryTab === "cellar" ? "active" : "drank"} wine entries in view`}
+        />
+        <KpiCard
+          label={kpiLabels.value}
+          value={formatCurrency(currentValue)}
+          trend={inventoryTab === "cellar" ? "Estimated current cellar value" : "Estimated value of visible drank bottles"}
+          tone="success"
+        />
+        <KpiCard label={kpiLabels.score} value={averageScore.toFixed(2)} trend={averageScoreLabel} tone="warning" />
+        <KpiCard
+          label={kpiLabels.readiness}
+          value={String(readyCount)}
+          trend={inventoryTab === "cellar" ? "Bottles suitable for near-term service" : "Drank bottles previously marked ready or peak"}
+          tone="danger"
+        />
       </section>
 
       <Card>

@@ -31,6 +31,10 @@ const DEFAULT_APIFY_VIVINO_ACTORS = [
   "scrapmania~vivino-ratings-scraper-with-vintages-from-url-list"
 ] as const;
 
+function canUseFileFallback() {
+  return !process.env.DATABASE_URL?.trim();
+}
+
 function pushDebug(
   entries: EnrichmentDebugEntry[] | undefined,
   stage: EnrichmentDebugEntry["stage"],
@@ -53,7 +57,11 @@ export async function listWines() {
     });
 
     return records.map(mapWineRecord);
-  } catch {
+  } catch (error) {
+    if (!canUseFileFallback()) {
+      throw error;
+    }
+
     return readStoredWines();
   }
 }
@@ -65,7 +73,11 @@ export async function getWine(id: string) {
     });
 
     return record ? mapWineRecord(record) : null;
-  } catch {
+  } catch (error) {
+    if (!canUseFileFallback()) {
+      throw error;
+    }
+
     const wines = (await readStoredWines()) as WineRecord[];
     return wines.find((wine) => wine.id === id) ?? null;
   }
@@ -108,7 +120,11 @@ export async function createWine(input: WineInput) {
     });
 
     return mapWineRecord(record);
-  } catch {
+  } catch (error) {
+    if (!canUseFileFallback()) {
+      throw error;
+    }
+
     const wines = (await readStoredWines()) as WineRecord[];
     const wine: WineRecord = {
       ...input,
@@ -172,7 +188,11 @@ export async function updateWine(id: string, patch: Partial<WineInput>) {
     });
 
     return mapWineRecord(record);
-  } catch {
+  } catch (error) {
+    if (!canUseFileFallback()) {
+      throw error;
+    }
+
     const wines = await readStoredWines();
     const index = wines.findIndex((wine) => wine.id === id);
 
@@ -207,7 +227,11 @@ export async function deleteWine(id: string) {
     });
 
     return true;
-  } catch {
+  } catch (error) {
+    if (!canUseFileFallback()) {
+      throw error;
+    }
+
     const wines = await readStoredWines();
     const nextWines = wines.filter((wine) => wine.id !== id);
 
