@@ -121,6 +121,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
   const region = asOptionalString(body.region);
   const country = asOptionalString(body.country);
   const grape = asOptionalString(body.grape);
+  const grapeVarieties = asOptionalString(body.grapeVarieties);
   const style = asOptionalString(body.style);
   const bottleSize = asOptionalString(body.bottleSize) || "750ml";
   const quantity = asPositiveInteger(body.quantity);
@@ -128,6 +129,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
   const estimatedValue = asNumber(body.estimatedValue);
   const vivinoLink = asOptionalString(body.vivinoLink);
   const vivinoScore = asNumber(body.vivinoScore);
+  const vivinoScoreSource = asOptionalString(body.vivinoScoreSource);
   const robertParkerScore = asNumber(body.robertParkerScore);
   const jamesSucklingScore = asNumber(body.jamesSucklingScore);
   const criticSource = asOptionalString(body.criticSource);
@@ -187,6 +189,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
         ...(body.region !== undefined ? { region } : {}),
         ...(body.country !== undefined ? { country } : {}),
         ...(body.grape !== undefined ? { grape } : {}),
+        ...(body.grapeVarieties !== undefined ? { grapeVarieties } : {}),
         ...(body.style !== undefined ? { style } : {}),
         ...(body.bottleSize !== undefined ? { bottleSize } : {}),
         ...(quantity !== null ? { quantity } : {}),
@@ -194,6 +197,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
         ...(estimatedValue !== null ? { estimatedValue } : {}),
         ...(body.vivinoLink !== undefined ? { vivinoLink } : {}),
         ...(vivinoScore !== null ? { vivinoScore } : {}),
+        ...(body.vivinoScoreSource !== undefined ? { vivinoScoreSource } : {}),
         ...(robertParkerScore !== null ? { robertParkerScore } : {}),
         ...(jamesSucklingScore !== null ? { jamesSucklingScore } : {}),
         ...(body.criticSource !== undefined ? { criticSource } : {}),
@@ -216,6 +220,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
         region,
         country,
         grape,
+        grapeVarieties,
         style,
         bottleSize,
         quantity: quantity ?? 1,
@@ -223,6 +228,7 @@ export function validateWineInput(payload: unknown, options: { partial?: boolean
         estimatedValue: estimatedValue ?? 0,
         vivinoLink,
         vivinoScore: vivinoScore ?? 0,
+        vivinoScoreSource,
         robertParkerScore: robertParkerScore ?? 0,
         jamesSucklingScore: jamesSucklingScore ?? 0,
         criticSource,

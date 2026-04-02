@@ -44,39 +44,82 @@ const grapeOptions = [
   "Other"
 ] as const;
 const regionOptions = [
-  "Judean Hills",
-  "Galilee",
-  "Golan Heights",
-  "Upper Galilee",
-  "Lower Galilee",
-  "Negev",
-  "Champagne",
+  "Aconcagua",
+  "Alsace",
+  "Barbaresco",
+  "Barolo",
+  "Bekaa Valley",
+  "Bolgheri",
   "Bordeaux",
   "Burgundy",
-  "Rhone",
-  "Loire Valley",
-  "Provence",
-  "Alsace",
+  "Campania",
+  "Champagne",
   "Chablis",
-  "Rioja",
-  "Ribera del Duero",
-  "Piedmont",
-  "Tuscany",
-  "Veneto",
-  "Sicily",
-  "Napa Valley",
-  "Sonoma",
-  "Willamette Valley",
-  "Paso Robles",
-  "Mendoza",
-  "Maipo Valley",
+  "Chianti Classico",
   "Colchagua Valley",
+  "Coonawarra",
   "Douro",
+  "Eden Valley",
+  "Etna",
+  "Galilee",
+  "Golan Heights",
+  "Judean Hills",
+  "Jura",
+  "Langhe",
+  "Loire Valley",
+  "Lower Galilee",
+  "Maipo Valley",
+  "Marlborough",
+  "Mendoza",
+  "McLaren Vale",
   "Mosel",
+  "Nahe",
+  "Napa Valley",
+  "Negev",
+  "Paarl",
+  "Paso Robles",
   "Priorat",
+  "Provence",
+  "Rheingau",
+  "Rhone",
+  "Ribera del Duero",
+  "Rioja",
+  "Sicily",
+  "Sonoma",
+  "Stellenbosch",
+  "Swartland",
+  "Tuscany",
+  "Upper Galilee",
+  "Veneto",
+  "Victoria",
+  "Willamette Valley",
+  "Wachau",
+  "Yarra Valley",
+  "Other"
+].sort((a, b) => a.localeCompare(b)) as string[];
+const countryOptions = [
+  "Israel",
+  "Italy",
+  "France",
+  "Argentina",
+  "Australia",
+  "Austria",
+  "Brazil",
+  "Chile",
+  "China",
+  "Georgia",
+  "Germany",
+  "Greece",
+  "Hungary",
+  "Moldova",
+  "New Zealand",
+  "Portugal",
+  "Romania",
+  "South Africa",
+  "Spain",
+  "United States",
   "Other"
 ] as const;
-const countryOptions = ["Israel", "Italy", "France", "Spain", "USA", "Portugal", "Australia", "Other"] as const;
 const styleOptions = ["Red", "White", "Rose", "Other"] as const;
 
 type WineFormState = {
@@ -87,6 +130,7 @@ type WineFormState = {
   region: string;
   country: string;
   grape: string;
+  grapeVarieties: string;
   style: string;
   bottleSize: string;
   quantity: string;
@@ -94,6 +138,7 @@ type WineFormState = {
   estimatedValue: string;
   vivinoLink: string;
   vivinoScore: string;
+  vivinoScoreSource: string;
   robertParkerScore: string;
   jamesSucklingScore: string;
   criticSource: string;
@@ -115,6 +160,7 @@ const emptyForm: WineFormState = {
   region: "",
   country: "",
   grape: "",
+  grapeVarieties: "",
   style: "",
   bottleSize: "750ml",
   quantity: "1",
@@ -122,6 +168,7 @@ const emptyForm: WineFormState = {
   estimatedValue: "",
   vivinoLink: "",
   vivinoScore: "",
+  vivinoScoreSource: "",
   robertParkerScore: "",
   jamesSucklingScore: "",
   criticSource: "",
@@ -173,6 +220,7 @@ function toFormState(wine: Partial<WineBottle>, locations: StorageLocation[]): W
     region: normalizeRegion(wine.region),
     country: normalizeCountry(wine.country),
     grape: normalizeGrape(wine.grape),
+    grapeVarieties: wine.grapeVarieties ?? "",
     style: normalizeStyle(wine.style),
     bottleSize: wine.bottleSize ?? "750ml",
     quantity: String(wine.quantity ?? 1),
@@ -180,6 +228,7 @@ function toFormState(wine: Partial<WineBottle>, locations: StorageLocation[]): W
     estimatedValue: wine.estimatedValue && wine.estimatedValue > 0 ? String(wine.estimatedValue) : "",
     vivinoLink: wine.vivinoLink ?? "",
     vivinoScore: wine.vivinoScore && wine.vivinoScore > 0 ? String(wine.vivinoScore) : "",
+    vivinoScoreSource: wine.vivinoScoreSource ?? "",
     robertParkerScore: wine.robertParkerScore && wine.robertParkerScore > 0 ? String(wine.robertParkerScore) : "",
     jamesSucklingScore: wine.jamesSucklingScore && wine.jamesSucklingScore > 0 ? String(wine.jamesSucklingScore) : "",
     criticSource: wine.criticSource ?? "",
@@ -464,6 +513,9 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     setStatusMessage(null);
     startTransition(async () => {
       const hasManualCriticScores = Number(form.robertParkerScore || 0) > 0 || Number(form.jamesSucklingScore || 0) > 0;
+      const hasManualVivinoScore =
+        Number(form.vivinoScore || 0) > 0 &&
+        (!editingWine || Number(form.vivinoScore || 0) !== (editingWine.vivinoScore || 0) || editingWine.vivinoScoreSource === "Manual");
       const response = await fetch(editingWine ? `/api/wines/${editingWine.id}` : "/api/wines", {
         method: editingWine ? "PATCH" : "POST",
         headers: {
@@ -477,6 +529,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           region: form.region,
           country: form.country,
           grape: form.grape,
+          grapeVarieties: form.grapeVarieties,
           style: form.style,
           bottleSize: form.bottleSize,
           quantity: Number(form.quantity),
@@ -484,6 +537,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           estimatedValue: Number(form.estimatedValue || 0),
           vivinoLink: form.vivinoLink,
           vivinoScore: Number(form.vivinoScore || 0),
+          vivinoScoreSource: hasManualVivinoScore || form.vivinoScoreSource === "Manual" ? "Manual" : form.vivinoScoreSource,
           robertParkerScore: Number(form.robertParkerScore || 0),
           jamesSucklingScore: Number(form.jamesSucklingScore || 0),
           criticSource: form.criticSource || (hasManualCriticScores ? "Manual" : ""),
@@ -511,7 +565,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setDialogOpen(false);
       resetForm();
 
-      if (savedWine && !hasManualCriticScores) {
+      if (savedWine && !hasManualCriticScores && !hasManualVivinoScore) {
         void (async () => {
           const enrichResponse = await fetch(`/api/wines/${savedWine.id}/enrich`, {
             method: "POST"
@@ -543,8 +597,14 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
             setError(enrichPayload.error);
           }
         })();
-      } else if (savedWine && hasManualCriticScores) {
-        setStatusMessage("Wine saved with manual critic scores.");
+      } else if (savedWine && (hasManualCriticScores || hasManualVivinoScore)) {
+        setStatusMessage(
+          hasManualCriticScores && hasManualVivinoScore
+            ? "Wine saved with manual Vivino and critic scores."
+            : hasManualVivinoScore
+              ? "Wine saved with a manual Vivino score."
+              : "Wine saved with manual critic scores."
+        );
       }
     });
   };
@@ -831,6 +891,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               </NativeSelect>
               <Input placeholder="Bottle size" value={form.bottleSize} onChange={(event) => updateForm("bottleSize", event.target.value)} />
             </div>
+            <Input placeholder="Grape Varieties" value={form.grapeVarieties} onChange={(event) => updateForm("grapeVarieties", event.target.value)} />
             <div className="grid gap-3 md:grid-cols-3">
               <Input placeholder="Quantity" value={form.quantity} onChange={(event) => updateForm("quantity", event.target.value)} />
               <Input placeholder="Buy price" value={form.purchasePrice} onChange={(event) => updateForm("purchasePrice", event.target.value)} />
@@ -840,6 +901,9 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               <Input placeholder="Vivino link" value={form.vivinoLink} onChange={(event) => updateForm("vivinoLink", event.target.value)} />
               <Input placeholder="Vivino score" value={form.vivinoScore} onChange={(event) => updateForm("vivinoScore", event.target.value)} />
             </div>
+            <p className="text-xs text-muted-foreground">
+              You can manually override the Vivino score. If you do, the inventory card will mark that Vivino score as manual and preserve it.
+            </p>
             <div className="space-y-2">
               <p className="text-sm font-medium">Manual critic override</p>
               <p className="text-xs text-muted-foreground">
@@ -953,6 +1017,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                 <div className="flex items-center gap-2">
                   {isCellarWine(wine) ? <Badge variant={getReadinessVariant(wine.readiness)}>{wine.readiness}</Badge> : <Badge variant="info">Drank</Badge>}
                   {wine.vivinoScore > 0 ? <Badge variant="info">{wine.vivinoScore.toFixed(1)} Vivino</Badge> : null}
+                  {wine.vivinoScore > 0 && wine.vivinoScoreSource === "Manual" ? <Badge variant="warning">Manual</Badge> : null}
                   {wine.robertParkerScore > 0 ? <Badge variant="warning">RP {wine.robertParkerScore}</Badge> : null}
                   {wine.jamesSucklingScore > 0 ? <Badge variant="warning">JS {wine.jamesSucklingScore}</Badge> : null}
                   {wine.criticSource ? <Badge variant="success">{wine.criticSource}</Badge> : null}
@@ -987,7 +1052,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                   </div>
                 </div>
 
-                <p className="text-sm text-muted-foreground">{wine.notes}</p>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  {wine.grapeVarieties ? <p>Grape Varieties: {wine.grapeVarieties}</p> : null}
+                  <p>{wine.notes}</p>
+                </div>
                 {wineStatusById[wine.id] ? (
                   <div className="rounded-2xl border border-border/80 bg-secondary/40 px-4 py-3 text-sm text-foreground">
                     {wineStatusById[wine.id]}

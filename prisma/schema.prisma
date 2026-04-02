@@ -166,6 +166,7 @@ model WineEntry {
   region             String?
   country            String?
   grape              String?
+  grapeVarieties     String?
   style              String?
   bottleSize         String         @default("750ml")
   quantity           Int            @default(1)
@@ -173,6 +174,7 @@ model WineEntry {
   estimatedValue     Float          @default(0)
   vivinoLink         String?
   vivinoScore        Float          @default(0)
+  vivinoScoreSource  String?
   robertParkerScore  Float          @default(0)
   jamesSucklingScore Float          @default(0)
   criticSource       String?

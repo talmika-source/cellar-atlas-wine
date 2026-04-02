@@ -32,9 +32,14 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   const hasManualCriticScores =
     (partialPatch.robertParkerScore ?? currentWine.robertParkerScore ?? 0) > 0 ||
     (partialPatch.jamesSucklingScore ?? currentWine.jamesSucklingScore ?? 0) > 0;
+  const hasManualVivinoScore =
+    partialPatch.vivinoScoreSource === "Manual" ||
+    ((partialPatch.vivinoScore ?? 0) > 0 &&
+      (partialPatch.vivinoScore !== currentWine.vivinoScore || currentWine.vivinoScoreSource === "Manual"));
 
   const shouldEnrich =
     !hasManualCriticScores &&
+    !hasManualVivinoScore &&
     (partialPatch.wineName !== undefined ||
       partialPatch.producer !== undefined ||
       partialPatch.region !== undefined ||
@@ -53,6 +58,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
           region: partialPatch.region ?? currentWine.region,
           country: partialPatch.country ?? currentWine.country,
           grape: partialPatch.grape ?? currentWine.grape,
+          grapeVarieties: partialPatch.grapeVarieties ?? currentWine.grapeVarieties,
           style: partialPatch.style ?? currentWine.style,
           bottleSize: partialPatch.bottleSize ?? currentWine.bottleSize,
           quantity: partialPatch.quantity ?? currentWine.quantity,
@@ -71,6 +77,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
                   grape: partialPatch.grape ?? currentWine.grape
                 }),
           vivinoScore: partialPatch.vivinoScore ?? currentWine.vivinoScore,
+          vivinoScoreSource: partialPatch.vivinoScoreSource ?? currentWine.vivinoScoreSource,
           robertParkerScore: partialPatch.robertParkerScore ?? currentWine.robertParkerScore,
           jamesSucklingScore: partialPatch.jamesSucklingScore ?? currentWine.jamesSucklingScore,
           criticSource: partialPatch.criticSource ?? currentWine.criticSource,
@@ -90,6 +97,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         } satisfies WineInput, { deepCriticLookup: false })
       : {
           ...partialPatch,
+          ...(hasManualVivinoScore
+            ? { vivinoScoreSource: "Manual" }
+            : {}),
           ...(hasManualCriticScores && partialPatch.criticSource === undefined && !currentWine.criticSource
             ? { criticSource: "Manual" }
             : {})

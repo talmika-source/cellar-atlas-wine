@@ -82,6 +82,7 @@ export async function createWine(input: WineInput) {
         region: input.region || null,
         country: input.country || null,
         grape: input.grape || null,
+        grapeVarieties: input.grapeVarieties || null,
         style: input.style || null,
         bottleSize: input.bottleSize,
         quantity: input.quantity,
@@ -89,6 +90,7 @@ export async function createWine(input: WineInput) {
         estimatedValue: input.estimatedValue,
         vivinoLink: input.vivinoLink || null,
         vivinoScore: input.vivinoScore,
+        vivinoScoreSource: input.vivinoScoreSource || null,
         robertParkerScore: input.robertParkerScore,
         jamesSucklingScore: input.jamesSucklingScore,
         criticSource: input.criticSource || null,
@@ -140,6 +142,7 @@ export async function updateWine(id: string, patch: Partial<WineInput>) {
         ...(patch.region !== undefined ? { region: patch.region || null } : {}),
         ...(patch.country !== undefined ? { country: patch.country || null } : {}),
         ...(patch.grape !== undefined ? { grape: patch.grape || null } : {}),
+        ...(patch.grapeVarieties !== undefined ? { grapeVarieties: patch.grapeVarieties || null } : {}),
         ...(patch.style !== undefined ? { style: patch.style || null } : {}),
         ...(patch.bottleSize !== undefined ? { bottleSize: patch.bottleSize } : {}),
         ...(patch.quantity !== undefined ? { quantity: patch.quantity } : {}),
@@ -147,6 +150,7 @@ export async function updateWine(id: string, patch: Partial<WineInput>) {
         ...(patch.estimatedValue !== undefined ? { estimatedValue: patch.estimatedValue } : {}),
         ...(patch.vivinoLink !== undefined ? { vivinoLink: patch.vivinoLink || null } : {}),
         ...(patch.vivinoScore !== undefined ? { vivinoScore: patch.vivinoScore } : {}),
+        ...(patch.vivinoScoreSource !== undefined ? { vivinoScoreSource: patch.vivinoScoreSource || null } : {}),
         ...(patch.robertParkerScore !== undefined ? { robertParkerScore: patch.robertParkerScore } : {}),
         ...(patch.jamesSucklingScore !== undefined ? { jamesSucklingScore: patch.jamesSucklingScore } : {}),
         ...(patch.criticSource !== undefined ? { criticSource: patch.criticSource || null } : {}),
@@ -314,6 +318,22 @@ function extractApifyScoreValue(value: unknown) {
   return null;
 }
 
+function normalizeGrapeVarietiesValue(value: unknown): string | null {
+  if (Array.isArray(value)) {
+    const items = value
+      .flatMap((item) => (typeof item === "string" ? [item.trim()] : []))
+      .filter(Boolean);
+
+    return items.length > 0 ? items.join(", ") : null;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  return null;
+}
+
 function extractYearValue(value: unknown) {
   if (typeof value === "number" && Number.isInteger(value) && value >= 1900 && value <= 2100) {
     return value;
@@ -382,10 +402,55 @@ function walkApifyVivinoScore(value: unknown, targetYear: number | null): { exac
   return { exact, fallback };
 }
 
-function extractApifyVivinoScore(payload: unknown, url: string) {
+function extractApifyGrapeVarieties(value: unknown): string | null {
+  if (!value) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const next = extractApifyGrapeVarieties(item);
+
+      if (next) {
+        return next;
+      }
+    }
+
+    return null;
+  }
+
+  if (typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+
+  for (const [key, nestedValue] of Object.entries(record)) {
+    if (/(grape.?varieties|grape_varieties|varieties|grapes)/i.test(key)) {
+      const direct = normalizeGrapeVarietiesValue(nestedValue);
+
+      if (direct) {
+        return direct;
+      }
+    }
+
+    const nested = extractApifyGrapeVarieties(nestedValue);
+
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+function extractApifyVivinoData(payload: unknown, url: string) {
   const targetYear = getVivinoUrlYear(url);
   const { exact, fallback } = walkApifyVivinoScore(payload, targetYear);
-  return exact ?? fallback;
+  return {
+    score: exact ?? fallback,
+    grapeVarieties: extractApifyGrapeVarieties(payload)
+  };
 }
 
 async function fetchVivinoScoreFromApify(url: string) {
@@ -437,10 +502,10 @@ async function fetchVivinoScoreFromApify(url: string) {
     }
 
     const payload = (await response.json()) as unknown;
-    const score = extractApifyVivinoScore(payload, url);
+    const result = extractApifyVivinoData(payload, url);
 
-    if (score) {
-      return score;
+    if (result.score || result.grapeVarieties) {
+      return result;
     }
 
     return null;
@@ -790,6 +855,11 @@ function extractVivinoScoreFromBrowserData(data: { html: string; title: string; 
 }
 
 export async function enrichWineWithVivino(input: WineInput, debugEntries?: EnrichmentDebugEntry[]) {
+  if (input.vivinoScoreSource === "Manual" && input.vivinoScore > 0) {
+    pushDebug(debugEntries, "vivino", "Vivino manual override", "skipped", "Manual Vivino score is preserved.");
+    return input;
+  }
+
   const manualVivinoLink = input.vivinoLink?.trim() ?? "";
   const searchQuery = buildVivinoSearchQuery(input);
   const searchUrl = buildVivinoSearchUrl(input);
@@ -815,12 +885,22 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
     try {
       const apifyScore = await fetchVivinoScoreFromApify(sourceUrl);
 
-      if (apifyScore) {
-        pushDebug(debugEntries, "vivino", "Vivino Apify", "matched", `Parsed Apify score ${apifyScore}.`);
+      if (apifyScore?.score || apifyScore?.grapeVarieties) {
+        pushDebug(
+          debugEntries,
+          "vivino",
+          "Vivino Apify",
+          "matched",
+          apifyScore?.score
+            ? `Parsed Apify score ${apifyScore.score}.`
+            : "Parsed Apify grape varieties."
+        );
         return {
           ...input,
           vivinoLink: sourceUrl,
-          vivinoScore: apifyScore
+          vivinoScore: apifyScore.score ?? input.vivinoScore,
+          vivinoScoreSource: apifyScore.score ? "Apify" : input.vivinoScoreSource,
+          grapeVarieties: input.grapeVarieties || apifyScore.grapeVarieties || ""
         };
       }
 
@@ -872,6 +952,7 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
             ...input,
             vivinoLink: resolvedVivinoLink,
             vivinoScore: detailScore,
+            vivinoScoreSource: "Vivino",
             drinkWindow,
             readiness
           };
@@ -887,6 +968,7 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
         ...input,
         vivinoLink: resolvedVivinoLink,
         vivinoScore: score,
+        vivinoScoreSource: "Vivino",
         drinkWindow,
         readiness
       };
@@ -910,6 +992,7 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
         ...input,
         vivinoLink: browserResolvedLink,
         vivinoScore: browserScore,
+        vivinoScoreSource: "Vivino",
         drinkWindow: browserWindow ? `${browserWindow.start}-${browserWindow.end}` : input.drinkWindow,
         readiness: browserWindow
           ? inferReadinessFromWindow(browserWindow) ?? inferReadinessFromOptionalVintage(input.vintage)
@@ -930,6 +1013,7 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
           ...input,
           vivinoLink: canonicalData.finalUrl || canonicalUrl,
           vivinoScore: canonicalScore,
+          vivinoScoreSource: "Vivino",
           drinkWindow: canonicalWindow ? `${canonicalWindow.start}-${canonicalWindow.end}` : input.drinkWindow,
           readiness:
             canonicalWindow
@@ -949,7 +1033,8 @@ export async function enrichWineWithVivino(input: WineInput, debugEntries?: Enri
     return {
       ...input,
       vivinoLink,
-      vivinoScore: searchSnippetScore
+      vivinoScore: searchSnippetScore,
+      vivinoScoreSource: "Vivino"
     };
   }
 
@@ -978,8 +1063,10 @@ function mergeEnrichmentResults(base: WineInput, criticResult: WineInput, vivino
     ...criticResult,
     vivinoLink: vivinoResult.vivinoLink || criticResult.vivinoLink || base.vivinoLink,
     vivinoScore: vivinoResult.vivinoScore || criticResult.vivinoScore || base.vivinoScore,
+    vivinoScoreSource: vivinoResult.vivinoScoreSource || criticResult.vivinoScoreSource || base.vivinoScoreSource,
     drinkWindow: vivinoResult.drinkWindow || criticResult.drinkWindow || base.drinkWindow,
     readiness: vivinoResult.readiness || criticResult.readiness || base.readiness,
+    grapeVarieties: vivinoResult.grapeVarieties || criticResult.grapeVarieties || base.grapeVarieties,
     robertParkerScore: criticResult.robertParkerScore || vivinoResult.robertParkerScore || base.robertParkerScore,
     jamesSucklingScore: criticResult.jamesSucklingScore || vivinoResult.jamesSucklingScore || base.jamesSucklingScore,
     criticSource: criticResult.criticSource || vivinoResult.criticSource || base.criticSource
@@ -1125,8 +1212,10 @@ export async function generateWineDraftFromScan(rawText: string) {
     estimatedValue: 0,
     vivinoLink: "",
     vivinoScore: 0,
+    vivinoScoreSource: "",
     robertParkerScore: 0,
     jamesSucklingScore: 0,
+    grapeVarieties: "",
     criticSource: "",
     locationId,
     shelf: "",

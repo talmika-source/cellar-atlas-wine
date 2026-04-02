@@ -37,6 +37,8 @@ export async function readStoredWines() {
   const wines = await readJsonFile<WineBottle[]>(winesPath);
   return wines.map((wine) => ({
     ...wine,
+    grapeVarieties: wine.grapeVarieties ?? "",
+    vivinoScoreSource: wine.vivinoScoreSource ?? "",
     cellarStatus: wine.cellarStatus ?? "Cellar",
     drankOn: wine.drankOn ?? ""
   }));

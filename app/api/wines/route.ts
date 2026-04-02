@@ -25,17 +25,22 @@ export async function POST(request: Request) {
     }
 
     const hasManualCriticScores = (validatedInput.robertParkerScore ?? 0) > 0 || (validatedInput.jamesSucklingScore ?? 0) > 0;
+    const hasManualVivinoScore = (validatedInput.vivinoScore ?? 0) > 0;
 
     const baseInput = {
       ...validatedInput,
       vivinoLink: validatedInput.vivinoLink || buildVivinoSearchUrl(validatedInput),
+      vivinoScoreSource:
+        hasManualVivinoScore && !validatedInput.vivinoScoreSource.trim()
+          ? "Manual"
+          : validatedInput.vivinoScoreSource,
       criticSource:
         hasManualCriticScores && !validatedInput.criticSource.trim()
           ? "Manual"
           : validatedInput.criticSource
     };
 
-    const enrichedInput = hasManualCriticScores
+    const enrichedInput = hasManualCriticScores || hasManualVivinoScore
       ? baseInput
       : await enrichWineWithExternalScores(baseInput, { deepCriticLookup: false });
 
