@@ -269,6 +269,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [scanImageUrl, setScanImageUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanOcrStatus, setScanOcrStatus] = useState<string | null>(null);
+  const [isScanOcrPending, setIsScanOcrPending] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [wineStatusById, setWineStatusById] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
@@ -459,13 +461,35 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const updateScanImage = async (file: File | null) => {
     if (!file) {
       setScanImageUrl("");
+      setScanOcrStatus(null);
       return;
     }
 
     try {
-      setScanImageUrl(await readImageFile(file));
+      setScanError(null);
+      const imageDataUrl = await readImageFile(file);
+      setScanImageUrl(imageDataUrl);
+      setScanOcrStatus("Reading bottle label...");
+      setIsScanOcrPending(true);
+
+      const { recognize } = await import("tesseract.js");
+      const {
+        data: { text }
+      } = await recognize(imageDataUrl, "eng");
+      const extractedText = text.replace(/\s+/g, " ").trim();
+
+      if (!extractedText) {
+        setScanOcrStatus("No readable label text was found. You can still type or paste text manually.");
+        return;
+      }
+
+      setScanText(extractedText);
+      setScanOcrStatus("Label text extracted. Review it if needed, then generate the draft.");
     } catch {
-      setScanError("Unable to load that bottle image.");
+      setScanError("Unable to read text from that bottle image.");
+      setScanOcrStatus(null);
+    } finally {
+      setIsScanOcrPending(false);
     }
   };
 
@@ -483,6 +507,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     setScanText("");
     setScanImageUrl("");
     setScanError(null);
+    setScanOcrStatus(null);
+    setIsScanOcrPending(false);
   };
 
   const openCreateDialog = () => {
@@ -707,6 +733,11 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   };
 
   const generateDraftFromScan = () => {
+    if (isScanOcrPending) {
+      setScanError("OCR is still running. Please wait a moment and try again.");
+      return;
+    }
+
     if (!scanText.trim() && !scanImageUrl) {
       setScanError("Paste OCR text, upload an image, or use Capture first.");
       return;
@@ -726,7 +757,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       });
 
       if (!response.ok) {
-        setScanError("Unable to generate a draft from that text.");
+        const payload = await readResponsePayload<{ error?: string }>(response);
+        setScanError(payload.error ?? "Unable to generate a draft from that text.");
         return;
       }
 
@@ -1020,9 +1052,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               value={scanText}
               onChange={(event) => setScanText(event.target.value)}
             />
+            {scanOcrStatus ? <p className="text-sm text-muted-foreground">{scanOcrStatus}</p> : null}
             {scanError ? <p className="text-sm text-rose-500">{scanError}</p> : null}
-            <Button onClick={generateDraftFromScan} disabled={isPending}>
-              Generate Draft
+            <Button onClick={generateDraftFromScan} disabled={isPending || isScanOcrPending}>
+              {isScanOcrPending ? "Reading Label..." : "Generate Draft"}
             </Button>
           </div>
         </DialogContent>
