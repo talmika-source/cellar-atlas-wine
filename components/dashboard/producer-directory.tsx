@@ -206,7 +206,19 @@ export function ProducerDirectory() {
   );
 
   const merchants = useMemo(
-    () => [...new Set(filteredWines.map((wine) => wine.supplierId.trim()).filter(Boolean))].sort(),
+    () =>
+      Array.from(
+        filteredWines.reduce((map, wine) => {
+          const merchant = wine.supplierId.trim();
+
+          if (!merchant) {
+            return map;
+          }
+
+          map.set(merchant, (map.get(merchant) ?? 0) + wine.quantity);
+          return map;
+        }, new Map<string, number>())
+      ).sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
     [filteredWines]
   );
 
@@ -324,10 +336,10 @@ export function ProducerDirectory() {
           <CardTitle>Merchants linked to the current inventory</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
-          {merchants.map((merchant) => (
+          {merchants.map(([merchant, bottleCount]) => (
             <div key={merchant} className="rounded-3xl border border-border/70 bg-background/70 p-4">
               <p className="font-semibold">{merchant}</p>
-              <p className="mt-2 text-sm text-muted-foreground">Free-text purchase source captured from your inventory entries.</p>
+              <p className="mt-2 text-sm text-muted-foreground">{bottleCount} {bottleCount === 1 ? "wine" : "wines"}</p>
             </div>
           ))}
         </CardContent>
