@@ -533,7 +533,7 @@ async function buildOcrCandidateImages(dataUrl: string) {
   return Array.from(new Set(candidates));
 }
 
-export function WineInventoryPanel({ query = "" }: { query?: string }) {
+export function WineInventoryPanel({ query = "", action }: { query?: string; action?: string }) {
   const [wines, setWines] = useState<WineBottle[]>([]);
   const [locations, setLocations] = useState<StorageLocation[]>([]);
   const [inventoryTab, setInventoryTab] = useState<"cellar" | "drank">("cellar");
@@ -654,6 +654,17 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
     void loadWines();
     void loadLocations();
   }, []);
+
+  useEffect(() => {
+    if (action === "scan") {
+      openScanDialog();
+      return;
+    }
+
+    if (action === "add") {
+      openCreateDialog();
+    }
+  }, [action]);
 
   const applyFilters = (candidateWines: WineBottle[]) =>
     candidateWines.filter((wine) => {
@@ -1081,6 +1092,12 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setScanDialogOpen(false);
       resetScanAssist();
       setDialogOpen(true);
+
+      if (editingWine) {
+        setStatusMessage("Bottle draft updated from scanned label text.");
+      } else {
+        setStatusMessage(null);
+      }
     });
   };
 
@@ -1089,10 +1106,18 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Inventory</p>
         <h2 className="text-3xl font-semibold tracking-tight">Track every bottle by fridge, shelf, value, and critic context.</h2>
-        <p className="max-w-3xl text-sm text-muted-foreground">
-          Add bottles manually or use scan assist: paste OCR text from a bottle photo, review the suggested metadata, and save it into the right storage location.
-        </p>
       </section>
+
+      <div className="flex flex-col gap-3 md:flex-row">
+        <Button variant="outline" onClick={openScanDialog}>
+          <Camera className="h-4 w-4" />
+          Scan Assist
+        </Button>
+        <Button onClick={openCreateDialog}>
+          <Plus className="h-4 w-4" />
+          Add Wine
+        </Button>
+      </div>
 
       <Card>
         <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
@@ -1130,16 +1155,6 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           <div>
             <CardDescription>Filters and actions</CardDescription>
             <CardTitle>Find bottles fast or add a new one</CardTitle>
-          </div>
-          <div className="flex flex-col gap-3 md:flex-row">
-            <Button variant="outline" onClick={openScanDialog}>
-              <Camera className="h-4 w-4" />
-              Scan Assist
-            </Button>
-            <Button onClick={openCreateDialog}>
-              <Plus className="h-4 w-4" />
-              Add Wine
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-2">

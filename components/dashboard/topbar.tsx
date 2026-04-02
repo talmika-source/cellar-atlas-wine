@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Bell, Search } from "lucide-react";
+import { Camera, Plus, Search } from "lucide-react";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,11 +51,20 @@ export function Topbar() {
       </div>
       <div className="flex items-center gap-3 self-end md:self-auto">
         {isPending ? <span className="text-xs text-muted-foreground">Searching...</span> : null}
-        <Button variant="outline" size="icon" aria-label="Notifications">
-          <Bell className="h-4 w-4" />
+        <Button asChild variant="outline">
+          <Link href={"/dashboard/inventory?action=scan" as Route}>
+            <Camera className="h-4 w-4" />
+            Scan
+          </Link>
+        </Button>
+        <Button asChild>
+          <Link href={"/dashboard/inventory?action=add" as Route}>
+            <Plus className="h-4 w-4" />
+            Add
+          </Link>
         </Button>
         <Avatar>
-          <AvatarFallback>CA</AvatarFallback>
+          <AvatarFallback>TA</AvatarFallback>
         </Avatar>
       </div>
     </div>

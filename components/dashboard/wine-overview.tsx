@@ -51,13 +51,14 @@ export function WineOverview() {
     readyBottles,
     highValueBottles,
     topRated,
-      peakBottles,
-      peakPriority,
-      averageScore,
-      averageScoreLabel,
-      totalCapacity,
-      totalOccupied
-    } = useMemo(() => {
+    peakBottles,
+    peakPriority,
+    averageScore,
+    averageScoreLabel,
+    totalCapacity,
+    totalOccupied,
+    topCountries
+  } = useMemo(() => {
     const cellarWines = wines.filter(isCellarWine);
     const totalBottleCount = cellarWines.reduce((sum, wine) => sum + wine.quantity, 0);
     const totalCellarValue = cellarWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0);
@@ -80,7 +81,21 @@ export function WineOverview() {
         : "0.00",
       averageScoreLabel: scoredWines.length > 0 ? "Average Vivino score across tracked bottles." : "No Vivino scores available yet.",
       totalCapacity: locations.reduce((sum, location) => sum + location.capacity, 0),
-      totalOccupied: totalBottleCount
+      totalOccupied: totalBottleCount,
+      topCountries: Object.entries(
+        cellarWines.reduce<Record<string, number>>((accumulator, wine) => {
+          const country = wine.country.trim();
+
+          if (!country) {
+            return accumulator;
+          }
+
+          accumulator[country] = (accumulator[country] ?? 0) + 1;
+          return accumulator;
+        }, {})
+      )
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, 4)
     };
   }, [locations, wines]);
 
@@ -95,11 +110,10 @@ export function WineOverview() {
 
       <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
         <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(92,20,35,0.95),rgba(47,16,23,0.92))] text-white">
-          <CardHeader>
+          <CardHeader className="pb-2">
             <CardDescription className="text-rose-100/80">Cellar Snapshot</CardDescription>
-            <CardTitle className="text-3xl leading-tight">Responsive wine inventory control for fridges, shelves, and long-term storage.</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
+          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
               <div className="flex items-center gap-2 text-sm text-rose-100/80">
                 <Snowflake className="h-4 w-4" />
@@ -125,6 +139,26 @@ export function WineOverview() {
               </div>
               <p className="mt-3 text-3xl font-semibold">{averageScore}</p>
               <p className="mt-2 text-sm text-rose-100/80">{averageScoreLabel}</p>
+            </div>
+            <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
+              <div className="flex items-center gap-2 text-sm text-rose-100/80">
+                <ArrowUpRight className="h-4 w-4" />
+                Top countries
+              </div>
+              <div className="mt-3 space-y-2">
+                {topCountries.length > 0 ? (
+                  topCountries.map(([country, count]) => (
+                    <div key={country} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="truncate text-white">{country}</span>
+                      <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-rose-50">
+                        {count} {count === 1 ? "wine" : "wines"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-rose-100/80">Add wines with country data to see your top regions represented here.</p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

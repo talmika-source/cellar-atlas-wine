@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "@/styles/globals.css";
 
 export const metadata: Metadata = {
-  title: "Cellar Atlas",
-  description: "Responsive wine inventory manager for fridges, cellars, and shelf-based storage."
+  title: "Wine Inventory - Tal Amram",
+  description: "Wine inventory manager for fridges, cellars, and shelf-based storage."
 };
 
 export default function RootLayout({

@@ -32,12 +32,12 @@ export function Sidebar({ pathname }: { pathname: string }) {
   return (
     <aside className="w-full rounded-[1.75rem] border border-border/80 bg-slate-950 px-5 py-6 text-slate-50 shadow-panel lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)] lg:w-72">
       <div className="flex items-center gap-3 border-b border-slate-800 pb-6">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-400/20 text-rose-200">
-          <LayoutDashboard className="h-6 w-6" />
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-400/20 text-base font-semibold text-rose-200">
+          TA
         </div>
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Wine Inventory</p>
-          <h1 className="text-xl font-semibold">Cellar Atlas</h1>
+          <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Private cellar</p>
+          <h1 className="text-xl font-semibold">Wine Inventory - Tal Amram</h1>
         </div>
       </div>
 
