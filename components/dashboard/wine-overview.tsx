@@ -52,7 +52,6 @@ export function WineOverview() {
     highValueBottles,
     topRated,
     peakBottles,
-    peakPriority,
     averageScore,
     averageScoreLabel,
     totalCapacity,
@@ -75,7 +74,6 @@ export function WineOverview() {
       peakBottles: peakBottleCount,
       highValueBottles: cellarWines.filter((wine) => wine.estimatedValue >= 100).length,
       topRated: [...cellarWines].sort((a, b) => (getVivinoPortfolioScore(b) ?? 0) - (getVivinoPortfolioScore(a) ?? 0)).slice(0, 4),
-      peakPriority: cellarWines.filter((wine) => wine.readiness === "Peak").slice(0, 5),
       averageScore: scoredWines.length
         ? (scoredWines.reduce((sum, entry) => sum + entry.score, 0) / scoredWines.length).toFixed(2)
         : "0.00",
@@ -108,7 +106,7 @@ export function WineOverview() {
         <KpiCard label="High-Value Bottles" value={String(highValueBottles)} trend="Vivino favorites and collector picks" tone="danger" />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+      <section>
         <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(92,20,35,0.95),rgba(47,16,23,0.92))] text-white">
           <CardHeader className="pb-2">
             <CardDescription className="text-rose-100/80">Cellar Snapshot</CardDescription>
@@ -160,32 +158,6 @@ export function WineOverview() {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardDescription>Priority Bottles</CardDescription>
-            <CardTitle>Drink or move soon</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {peakPriority.map((wine) => (
-              <div key={wine.id} className="rounded-3xl border border-border/70 bg-background/70 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">
-                      {getWineDisplayTitle(wine)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {(hasVintageInWineName(wine.wineName, wine.vintage) ? null : wine.vintage) ? `${wine.vintage} • ` : ""}
-                      {[wine.region, formatWinePlacement(wine.shelf, wine.slot)].filter(Boolean).join(" • ")}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-amber-500/15 px-3 py-1 text-xs font-medium text-amber-700">{wine.readiness}</span>
-                </div>
-                <p className="mt-3 text-sm text-muted-foreground">{wine.notes}</p>
-              </div>
-            ))}
           </CardContent>
         </Card>
       </section>

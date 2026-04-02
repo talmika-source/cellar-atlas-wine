@@ -1105,7 +1105,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
     <div className="space-y-6">
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Inventory</p>
-        <h2 className="text-3xl font-semibold tracking-tight">Track every bottle by fridge, shelf, value, and critic context.</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Track every bottle by fridge, shelf, value, and critic.</h2>
       </section>
 
       <div className="flex flex-col gap-3 md:flex-row">
