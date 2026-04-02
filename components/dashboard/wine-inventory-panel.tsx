@@ -269,6 +269,75 @@ function scoreOcrText(text: string) {
   return alphaMatches.length * 2 + wordMatches.length * 12 - weirdMatches.length * 5;
 }
 
+function extractPromisingOcrText(text: string) {
+  const normalizedLines = text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (normalizedLines.length === 0) {
+    return "";
+  }
+
+  const wineKeywords = [
+    "barolo",
+    "barbaresco",
+    "brunello",
+    "montalcino",
+    "chianti",
+    "rioja",
+    "bourgogne",
+    "burgundy",
+    "bordeaux",
+    "pauillac",
+    "margaux",
+    "castiglione",
+    "vietti",
+    "chateau",
+    "castello",
+    "tenuta",
+    "rosso",
+    "bianco",
+    "riserva",
+    "italia",
+    "italy",
+    "france",
+    "spain",
+    "doc",
+    "docg"
+  ];
+
+  const scoredLines = normalizedLines
+    .map((line) => {
+      const lower = line.toLowerCase();
+      const keywordHits = wineKeywords.filter((keyword) => lower.includes(keyword)).length;
+      const hasVintage = /\b(19|20)\d{2}\b/.test(line);
+      const upperWords = line.match(/\b[A-Z][A-Z'’.-]{2,}\b/g)?.length ?? 0;
+      const alphaRatio = (line.match(/[A-Za-z]/g)?.length ?? 0) / Math.max(line.length, 1);
+      const weirdCount = line.match(/[^A-Za-z0-9\s,'’.&\-()/]/g)?.length ?? 0;
+
+      return {
+        line,
+        score:
+          scoreOcrText(line) +
+          keywordHits * 40 +
+          upperWords * 8 +
+          (hasVintage ? 30 : 0) +
+          (alphaRatio > 0.55 ? 20 : 0) -
+          weirdCount * 10
+      };
+    })
+    .filter((entry) => entry.score > 20)
+    .sort((left, right) => right.score - left.score);
+
+  if (scoredLines.length === 0) {
+    return normalizedLines.join(" ").trim();
+  }
+
+  const selected = scoredLines.slice(0, 8).map((entry) => entry.line);
+  return Array.from(new Set(selected)).join(" ").trim();
+}
+
 async function preprocessImageForOcr(dataUrl: string) {
   const image = new Image();
   image.decoding = "async";
@@ -306,6 +375,43 @@ async function preprocessImageForOcr(dataUrl: string) {
 
   context.putImageData(imageData, 0, 0);
   return canvas.toDataURL("image/png");
+}
+
+async function buildOcrCandidateImages(dataUrl: string) {
+  const image = new Image();
+  image.decoding = "async";
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Unable to decode image for OCR."));
+    image.src = dataUrl;
+  });
+
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return [dataUrl];
+  }
+
+  const cropToDataUrl = (sx: number, sy: number, sw: number, sh: number) => {
+    canvas.width = Math.max(1, Math.round(sw));
+    canvas.height = Math.max(1, Math.round(sh));
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/png");
+  };
+
+  const fullWidth = image.width;
+  const fullHeight = image.height;
+  const candidates = [
+    dataUrl,
+    cropToDataUrl(fullWidth * 0.1, fullHeight * 0.18, fullWidth * 0.8, fullHeight * 0.68),
+    cropToDataUrl(fullWidth * 0.16, fullHeight * 0.28, fullWidth * 0.68, fullHeight * 0.5),
+    cropToDataUrl(fullWidth * 0.2, fullHeight * 0.42, fullWidth * 0.6, fullHeight * 0.34)
+  ];
+
+  return Array.from(new Set(candidates));
 }
 
 export function WineInventoryPanel({ query = "" }: { query?: string }) {
@@ -526,14 +632,22 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setIsScanOcrPending(true);
 
       const { recognize } = await import("tesseract.js");
-      const processedImageDataUrl = await preprocessImageForOcr(imageDataUrl);
-      const [processedResult, originalResult] = await Promise.all([
-        recognize(processedImageDataUrl, "eng"),
-        recognize(imageDataUrl, "eng")
-      ]);
-      const processedText = processedResult.data.text.replace(/\s+/g, " ").trim();
-      const originalText = originalResult.data.text.replace(/\s+/g, " ").trim();
-      const extractedText = scoreOcrText(processedText) >= scoreOcrText(originalText) ? processedText : originalText;
+      const candidateImages = await buildOcrCandidateImages(imageDataUrl);
+      const candidateTexts = await Promise.all(
+        candidateImages.flatMap((candidateImage) => {
+          const processedCandidatePromise = preprocessImageForOcr(candidateImage);
+
+          return [
+            recognize(candidateImage, "eng").then((result) => extractPromisingOcrText(result.data.text)),
+            processedCandidatePromise
+              .then((processedCandidateImage) => recognize(processedCandidateImage, "eng"))
+              .then((result) => extractPromisingOcrText(result.data.text))
+          ];
+        })
+      );
+      const extractedText = candidateTexts
+        .map((text) => text.replace(/\s+/g, " ").trim())
+        .sort((left, right) => scoreOcrText(right) - scoreOcrText(left))[0] ?? "";
 
       if (!extractedText) {
         setScanOcrStatus("No readable label text was found. You can still type or paste text manually.");
