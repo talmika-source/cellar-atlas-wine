@@ -255,6 +255,59 @@ function getReadinessVariant(readiness: WineBottle["readiness"]) {
   return "info";
 }
 
+function scoreOcrText(text: string) {
+  const trimmed = text.replace(/\s+/g, " ").trim();
+
+  if (!trimmed) {
+    return 0;
+  }
+
+  const alphaMatches = trimmed.match(/[A-Za-z]/g) ?? [];
+  const weirdMatches = trimmed.match(/[^A-Za-z0-9\s,'’.&\-()/]/g) ?? [];
+  const wordMatches = trimmed.match(/[A-Za-z]{3,}/g) ?? [];
+
+  return alphaMatches.length * 2 + wordMatches.length * 12 - weirdMatches.length * 5;
+}
+
+async function preprocessImageForOcr(dataUrl: string) {
+  const image = new Image();
+  image.decoding = "async";
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Unable to decode image for OCR."));
+    image.src = dataUrl;
+  });
+
+  const scale = Math.max(2, image.width < 1200 ? 3 : 2);
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width * scale;
+  canvas.height = image.height * scale;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return dataUrl;
+  }
+
+  context.imageSmoothingEnabled = false;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+
+  for (let index = 0; index < data.length; index += 4) {
+    const grayscale = data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
+    const boosted = grayscale > 160 ? 255 : grayscale < 90 ? 0 : grayscale;
+
+    data[index] = boosted;
+    data[index + 1] = boosted;
+    data[index + 2] = boosted;
+  }
+
+  context.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
 export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [wines, setWines] = useState<WineBottle[]>([]);
   const [locations, setLocations] = useState<StorageLocation[]>([]);
@@ -473,10 +526,14 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setIsScanOcrPending(true);
 
       const { recognize } = await import("tesseract.js");
-      const {
-        data: { text }
-      } = await recognize(imageDataUrl, "eng");
-      const extractedText = text.replace(/\s+/g, " ").trim();
+      const processedImageDataUrl = await preprocessImageForOcr(imageDataUrl);
+      const [processedResult, originalResult] = await Promise.all([
+        recognize(processedImageDataUrl, "eng"),
+        recognize(imageDataUrl, "eng")
+      ]);
+      const processedText = processedResult.data.text.replace(/\s+/g, " ").trim();
+      const originalText = originalResult.data.text.replace(/\s+/g, " ").trim();
+      const extractedText = scoreOcrText(processedText) >= scoreOcrText(originalText) ? processedText : originalText;
 
       if (!extractedText) {
         setScanOcrStatus("No readable label text was found. You can still type or paste text manually.");
