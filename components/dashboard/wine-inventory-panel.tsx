@@ -565,7 +565,7 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
       setDialogOpen(false);
       resetForm();
 
-      if (savedWine && !hasManualCriticScores && !hasManualVivinoScore) {
+      if (savedWine) {
         void (async () => {
           const enrichResponse = await fetch(`/api/wines/${savedWine.id}/enrich`, {
             method: "POST"
@@ -586,6 +586,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
               enrichPayload.debug?.length
             ) {
               setStatusMessage(buildNoScoreMessage(enrichPayload.debug));
+            } else if (enrichPayload.data && enrichPayload.data.grapeVarieties && !enrichPayload.data.vivinoScore && !hasManualCriticScores && !hasManualVivinoScore) {
+              setStatusMessage("Wine saved. Grape varieties were enriched automatically.");
             }
 
             await loadWines();
@@ -597,7 +599,9 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
             setError(enrichPayload.error);
           }
         })();
-      } else if (savedWine && (hasManualCriticScores || hasManualVivinoScore)) {
+      }
+
+      if (savedWine && (hasManualCriticScores || hasManualVivinoScore)) {
         setStatusMessage(
           hasManualCriticScores && hasManualVivinoScore
             ? "Wine saved with manual Vivino and critic scores."
@@ -1046,14 +1050,13 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
                     <p className="text-muted-foreground">Value {formatCurrency(wine.estimatedValue)}</p>
                   </div>
                   <div className="rounded-3xl bg-secondary/60 p-4 text-sm">
-                    <p className="text-muted-foreground">Merchant</p>
-                    <p className="mt-1 font-medium text-foreground">{wine.supplierId || "Unassigned"}</p>
+                    <p className="text-muted-foreground">Grape Varieties</p>
+                    <p className="mt-1 font-medium text-foreground">{wine.grapeVarieties || "Not available yet"}</p>
                     <p className="text-muted-foreground">{wine.cellarStatus === "Drank" && wine.drankOn ? `Drank on ${wine.drankOn}` : wine.drinkWindow}</p>
                   </div>
                 </div>
 
                 <div className="space-y-1 text-sm text-muted-foreground">
-                  {wine.grapeVarieties ? <p>Grape Varieties: {wine.grapeVarieties}</p> : null}
                   <p>{wine.notes}</p>
                 </div>
                 {wineStatusById[wine.id] ? (
