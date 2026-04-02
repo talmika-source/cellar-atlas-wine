@@ -1,12 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { getWineDisplayName } from "@/lib/wine-display";
-import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
+import { getVivinoPortfolioScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type WineBottle } from "@/lib/wine-data";
 
@@ -308,14 +309,23 @@ export function ProducerDirectory() {
                     <div key={wine.id} className="rounded-3xl border border-border/70 bg-background/70 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="font-semibold">
+                          <Link
+                            href={`/dashboard/inventory?q=${encodeURIComponent(getWineDisplayName(wine.wineName, wine.vintage))}`}
+                            className="font-semibold transition hover:text-primary"
+                          >
                             {getWineDisplayName(wine.wineName, wine.vintage)}
-                          </p>
+                          </Link>
                           <p className="text-sm text-muted-foreground">
                             {wine.vintage} • {wine.style} • {wine.grape} • Qty {wine.quantity}
                           </p>
+                          <Link
+                            href={`/dashboard/inventory?q=${encodeURIComponent(getWineDisplayName(wine.wineName, wine.vintage))}`}
+                            className="mt-2 inline-flex text-xs font-medium text-primary transition hover:text-primary/80"
+                          >
+                            Open in inventory
+                          </Link>
                         </div>
-                        <span className="text-sm font-medium text-primary">{(getPrimaryCellarScore(wine) ?? 0).toFixed(1)}</span>
+                        <span className="text-sm font-medium text-primary">{(getVivinoPortfolioScore(wine) ?? 0).toFixed(1)}</span>
                       </div>
                     </div>
                   ))}
