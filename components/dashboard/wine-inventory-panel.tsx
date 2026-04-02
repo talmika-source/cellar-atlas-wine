@@ -269,6 +269,11 @@ function scoreOcrText(text: string) {
   return alphaMatches.length * 2 + wordMatches.length * 12 - weirdMatches.length * 5;
 }
 
+function extractVintageCandidate(text: string) {
+  const matches = Array.from(text.matchAll(/\b(19[5-9]\d|20[0-2]\d|2030)\b/g)).map((match) => match[1]);
+  return matches.at(0) ?? "";
+}
+
 const ocrKeywordSet = Array.from(
   new Set(
     [
@@ -337,6 +342,50 @@ function isLikelyUsefulOcrLine(line: string) {
   }
 
   return alphaRatio > 0.55;
+}
+
+type OcrLineLike = {
+  text?: string;
+  confidence?: number;
+  bbox?: {
+    x0?: number;
+    y0?: number;
+    x1?: number;
+    y1?: number;
+  };
+};
+
+function extractLargestOcrLines(lines: OcrLineLike[] | undefined, fallbackText: string) {
+  const normalizedFromLines =
+    lines
+      ?.map((line) => {
+        const text = line.text?.replace(/\s+/g, " ").trim() ?? "";
+        const width = Math.max(0, (line.bbox?.x1 ?? 0) - (line.bbox?.x0 ?? 0));
+        const height = Math.max(0, (line.bbox?.y1 ?? 0) - (line.bbox?.y0 ?? 0));
+        const keywordHits = ocrKeywordSet.filter((keyword) => text.toLowerCase().includes(keyword)).length;
+        const vintage = extractVintageCandidate(text);
+
+        return {
+          text,
+          y: line.bbox?.y0 ?? 0,
+          prominence: height * 3 + width * 0.015 + (line.confidence ?? 0) * 2 + keywordHits * 40 + (vintage ? 80 : 0)
+        };
+      })
+      .filter((line) => line.text && isLikelyUsefulOcrLine(line.text))
+      .sort((left, right) => right.prominence - left.prominence) ?? [];
+
+  if (normalizedFromLines.length > 0) {
+    return normalizedFromLines
+      .slice(0, 4)
+      .sort((left, right) => left.y - right.y)
+      .map((line) => line.text);
+  }
+
+  return fallbackText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line && isLikelyUsefulOcrLine(line))
+    .slice(0, 4);
 }
 
 function extractPromisingOcrText(text: string) {
@@ -708,16 +757,37 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           const processedCandidatePromise = preprocessImageForOcr(candidateImage);
 
           return [
-            recognize(candidateImage, "eng").then((result) => extractPromisingOcrText(result.data.text)),
+            recognize(candidateImage, "eng").then((result) => {
+              const lineData = result.data as typeof result.data & { lines?: OcrLineLike[] };
+              const primaryLines = extractLargestOcrLines(lineData.lines, result.data.text);
+              const promotedText = extractPromisingOcrText(primaryLines.join("\n"));
+              const vintage = extractVintageCandidate(result.data.text);
+
+              return {
+                text: Array.from(new Set([...primaryLines, promotedText, vintage].filter(Boolean))).join(" ").trim(),
+                vintage,
+                score: scoreOcrText(promotedText || primaryLines.join(" "))
+              };
+            }),
             processedCandidatePromise
               .then((processedCandidateImage) => recognize(processedCandidateImage, "eng"))
-              .then((result) => extractPromisingOcrText(result.data.text))
+              .then((result) => {
+                const lineData = result.data as typeof result.data & { lines?: OcrLineLike[] };
+                const primaryLines = extractLargestOcrLines(lineData.lines, result.data.text);
+                const promotedText = extractPromisingOcrText(primaryLines.join("\n"));
+                const vintage = extractVintageCandidate(result.data.text);
+
+                return {
+                  text: Array.from(new Set([...primaryLines, promotedText, vintage].filter(Boolean))).join(" ").trim(),
+                  vintage,
+                  score: scoreOcrText(promotedText || primaryLines.join(" ")) + (vintage ? 50 : 0)
+                };
+              })
           ];
         })
       );
-      const extractedText = candidateTexts
-        .map((text) => text.replace(/\s+/g, " ").trim())
-        .sort((left, right) => scoreOcrText(right) - scoreOcrText(left))[0] ?? "";
+      const bestCandidate = candidateTexts.sort((left, right) => right.score - left.score)[0];
+      const extractedText = bestCandidate?.text.replace(/\s+/g, " ").trim() ?? "";
 
       if (!extractedText) {
         setScanOcrStatus("No readable label text was found. You can still type or paste text manually.");
