@@ -269,6 +269,76 @@ function scoreOcrText(text: string) {
   return alphaMatches.length * 2 + wordMatches.length * 12 - weirdMatches.length * 5;
 }
 
+const ocrKeywordSet = Array.from(
+  new Set(
+    [
+      ...grapeOptions,
+      ...regionOptions,
+      ...countryOptions,
+      "barolo",
+      "barbaresco",
+      "brunello",
+      "montalcino",
+      "chianti",
+      "rioja",
+      "bourgogne",
+      "burgundy",
+      "bordeaux",
+      "pauillac",
+      "margaux",
+      "castiglione",
+      "vietti",
+      "chateau",
+      "castello",
+      "tenuta",
+      "rosso",
+      "bianco",
+      "riserva",
+      "denominazione",
+      "origine",
+      "controllata",
+      "garantita",
+      "prodotto"
+    ]
+      .flatMap((value) => value.toLowerCase().split(/[\s/()-]+/))
+      .filter((value) => value.length >= 3)
+  )
+);
+
+function isLikelyUsefulOcrLine(line: string) {
+  const compact = line.replace(/\s+/g, " ").trim();
+
+  if (!compact) {
+    return false;
+  }
+
+  const alphaCount = compact.match(/[A-Za-z]/g)?.length ?? 0;
+  const weirdCount = compact.match(/[^A-Za-z0-9\s,'’.&\-()/]/g)?.length ?? 0;
+  const tokenCount = compact.split(/\s+/).length;
+  const singleCharTokens = compact.split(/\s+/).filter((token) => token.length === 1).length;
+  const hasVintage = /\b(19|20)\d{2}\b/.test(compact);
+  const hasKeyword = ocrKeywordSet.some((keyword) => compact.toLowerCase().includes(keyword));
+  const alphaRatio = alphaCount / Math.max(compact.length, 1);
+
+  if (hasVintage || hasKeyword) {
+    return true;
+  }
+
+  if (alphaCount < 5) {
+    return false;
+  }
+
+  if (weirdCount > Math.max(3, compact.length * 0.1)) {
+    return false;
+  }
+
+  if (tokenCount > 0 && singleCharTokens / tokenCount > 0.35) {
+    return false;
+  }
+
+  return alphaRatio > 0.55;
+}
+
 function extractPromisingOcrText(text: string) {
   const normalizedLines = text
     .split(/\r?\n/)
@@ -279,42 +349,18 @@ function extractPromisingOcrText(text: string) {
     return "";
   }
 
-  const wineKeywords = [
-    "barolo",
-    "barbaresco",
-    "brunello",
-    "montalcino",
-    "chianti",
-    "rioja",
-    "bourgogne",
-    "burgundy",
-    "bordeaux",
-    "pauillac",
-    "margaux",
-    "castiglione",
-    "vietti",
-    "chateau",
-    "castello",
-    "tenuta",
-    "rosso",
-    "bianco",
-    "riserva",
-    "italia",
-    "italy",
-    "france",
-    "spain",
-    "doc",
-    "docg"
-  ];
-
   const scoredLines = normalizedLines
+    .filter(isLikelyUsefulOcrLine)
     .map((line) => {
       const lower = line.toLowerCase();
-      const keywordHits = wineKeywords.filter((keyword) => lower.includes(keyword)).length;
+      const keywordHits = ocrKeywordSet.filter((keyword) => lower.includes(keyword)).length;
       const hasVintage = /\b(19|20)\d{2}\b/.test(line);
       const upperWords = line.match(/\b[A-Z][A-Z'’.-]{2,}\b/g)?.length ?? 0;
       const alphaRatio = (line.match(/[A-Za-z]/g)?.length ?? 0) / Math.max(line.length, 1);
       const weirdCount = line.match(/[^A-Za-z0-9\s,'’.&\-()/]/g)?.length ?? 0;
+      const titleCaseWords = line.match(/\b[A-Z][a-z]{2,}\b/g)?.length ?? 0;
+      const docMatches = line.match(/\bDOCG?\b/gi)?.length ?? 0;
+      const producerLikeWords = line.match(/\b[A-Z][A-Za-z'’.-]{4,}\b/g)?.length ?? 0;
 
       return {
         line,
@@ -322,19 +368,23 @@ function extractPromisingOcrText(text: string) {
           scoreOcrText(line) +
           keywordHits * 40 +
           upperWords * 8 +
+          titleCaseWords * 10 +
+          producerLikeWords * 6 +
+          docMatches * 25 +
           (hasVintage ? 30 : 0) +
           (alphaRatio > 0.55 ? 20 : 0) -
           weirdCount * 10
       };
     })
-    .filter((entry) => entry.score > 20)
+    .filter((entry) => entry.score > 10)
     .sort((left, right) => right.score - left.score);
 
   if (scoredLines.length === 0) {
-    return normalizedLines.join(" ").trim();
+    const fallback = normalizedLines.filter((line) => /[A-Za-z]{3,}/.test(line)).slice(0, 4);
+    return fallback.join(" ").trim();
   }
 
-  const selected = scoredLines.slice(0, 8).map((entry) => entry.line);
+  const selected = scoredLines.slice(0, 6).map((entry) => entry.line);
   return Array.from(new Set(selected)).join(" ").trim();
 }
 
@@ -402,13 +452,33 @@ async function buildOcrCandidateImages(dataUrl: string) {
     return canvas.toDataURL("image/png");
   };
 
+  const rotateDataUrl = (sourceDataUrl: string, degrees: number) => {
+    const radians = (degrees * Math.PI) / 180;
+    const sourceImage = new Image();
+    sourceImage.src = sourceDataUrl;
+    canvas.width = image.width;
+    canvas.height = image.height;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.save();
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate(radians);
+    context.drawImage(sourceImage, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+    context.restore();
+    return canvas.toDataURL("image/png");
+  };
+
   const fullWidth = image.width;
   const fullHeight = image.height;
+  const centerLabel = cropToDataUrl(fullWidth * 0.12, fullHeight * 0.2, fullWidth * 0.76, fullHeight * 0.64);
   const candidates = [
+    centerLabel,
     dataUrl,
-    cropToDataUrl(fullWidth * 0.1, fullHeight * 0.18, fullWidth * 0.8, fullHeight * 0.68),
-    cropToDataUrl(fullWidth * 0.16, fullHeight * 0.28, fullWidth * 0.68, fullHeight * 0.5),
-    cropToDataUrl(fullWidth * 0.2, fullHeight * 0.42, fullWidth * 0.6, fullHeight * 0.34)
+    cropToDataUrl(fullWidth * 0.08, fullHeight * 0.12, fullWidth * 0.84, fullHeight * 0.76),
+    cropToDataUrl(fullWidth * 0.16, fullHeight * 0.24, fullWidth * 0.68, fullHeight * 0.56),
+    cropToDataUrl(fullWidth * 0.14, fullHeight * 0.46, fullWidth * 0.72, fullHeight * 0.28),
+    cropToDataUrl(fullWidth * 0.16, fullHeight * 0.62, fullWidth * 0.68, fullHeight * 0.22),
+    rotateDataUrl(centerLabel, -3),
+    rotateDataUrl(centerLabel, 3)
   ];
 
   return Array.from(new Set(candidates));
