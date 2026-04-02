@@ -7,7 +7,7 @@ import { KpiCard } from "@/components/cards/kpi-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWineDisplayTitle, hasVintageInWineName } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
-import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
+import { getVivinoPortfolioScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
 import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
 
@@ -73,7 +73,7 @@ export function WineOverview() {
       readyBottles: readyBottleCount,
       peakBottles: peakBottleCount,
       highValueBottles: cellarWines.filter((wine) => wine.estimatedValue >= 100).length,
-      topRated: [...cellarWines].sort((a, b) => (getPrimaryCellarScore(b) ?? 0) - (getPrimaryCellarScore(a) ?? 0)).slice(0, 4),
+      topRated: [...cellarWines].sort((a, b) => (getVivinoPortfolioScore(b) ?? 0) - (getVivinoPortfolioScore(a) ?? 0)).slice(0, 4),
       peakPriority: cellarWines.filter((wine) => wine.readiness === "Peak").slice(0, 5),
       averageScore: scoredWines.length
         ? (scoredWines.reduce((sum, entry) => sum + entry.score, 0) / scoredWines.length).toFixed(2)
@@ -213,7 +213,7 @@ export function WineOverview() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-sm font-medium text-primary">
-                  {(getPrimaryCellarScore(wine) ?? 0).toFixed(1)}
+                  {(getVivinoPortfolioScore(wine) ?? 0).toFixed(1)}
                   <ArrowUpRight className="h-4 w-4" />
                 </div>
               </a>
