@@ -63,10 +63,7 @@ export function Sidebar({ pathname }: { pathname: string }) {
       </nav>
 
       <div className="mt-auto hidden rounded-[1.5rem] bg-gradient-to-br from-rose-500/20 to-amber-500/10 p-5 lg:block">
-        <p className="text-sm font-medium text-slate-100">Service Readiness</p>
-        <p className="mt-2 text-sm text-slate-300">
-          Keep every bottle mapped to a fridge, a shelf, and a moment when it should actually be opened.
-        </p>
+        <p className="text-lg font-semibold text-slate-100">Tal&apos;s Celler</p>
       </div>
     </aside>
   );

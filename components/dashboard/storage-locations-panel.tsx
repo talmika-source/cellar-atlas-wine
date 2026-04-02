@@ -171,7 +171,7 @@ export function StorageLocationsPanel() {
     <div className="space-y-6">
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Locations</p>
-        <h2 className="text-3xl font-semibold tracking-tight">Manage fridges and storage zones as editable inventory locations.</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Manage Fridges and Storage zones.</h2>
       </section>
 
       <Card>

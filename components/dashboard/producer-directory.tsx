@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
 import { getWineDisplayName } from "@/lib/wine-display";
 import { getPrimaryCellarScore, getVivinoPortfolioScore } from "@/lib/wine-score";
@@ -53,17 +54,21 @@ function FilterSelect({
 
 export function ProducerDirectory() {
   const [wines, setWines] = useState<WineBottle[]>([]);
+  const [searchFilter, setSearchFilter] = useState("");
   const [producerFilter, setProducerFilter] = useState<string[]>([]);
   const [vintageFilter, setVintageFilter] = useState<string[]>([]);
   const [regionFilter, setRegionFilter] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState<string[]>([]);
+  const [grapeVarietiesFilter, setGrapeVarietiesFilter] = useState<string[]>([]);
   const [aboveFourOnly, setAboveFourOnly] = useState(false);
 
   const clearFilters = () => {
+    setSearchFilter("");
     setProducerFilter([]);
     setVintageFilter([]);
     setRegionFilter([]);
     setCountryFilter([]);
+    setGrapeVarietiesFilter([]);
     setAboveFourOnly(false);
   };
 
@@ -114,18 +119,47 @@ export function ProducerDirectory() {
     [cellarWines]
   );
 
+  const grapeVarietiesOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          cellarWines
+            .flatMap((wine) => [wine.grape, ...wine.grapeVarieties.split(",")])
+            .map((value) => value.trim())
+            .filter(Boolean)
+        )
+      ].sort((a, b) => a.localeCompare(b)),
+    [cellarWines]
+  );
+
   const filteredWines = useMemo(
     () =>
       cellarWines.filter((wine) => {
+        const haystack = [
+          wine.wineName,
+          wine.producer,
+          wine.grape,
+          wine.grapeVarieties,
+          wine.region,
+          wine.country
+        ]
+          .join(" ")
+          .toLowerCase();
+        const normalizedSearch = searchFilter.trim().toLowerCase();
         const matchesProducer = producerFilter.length === 0 || producerFilter.includes(wine.producer.trim());
         const matchesVintage = vintageFilter.length === 0 || vintageFilter.includes(String(wine.vintage ?? ""));
         const matchesRegion = regionFilter.length === 0 || regionFilter.includes(wine.region.trim());
         const matchesCountry = countryFilter.length === 0 || countryFilter.includes(wine.country.trim());
+        const wineVarieties = [wine.grape, ...wine.grapeVarieties.split(",")].map((value) => value.trim().toLowerCase()).filter(Boolean);
+        const matchesGrapeVarieties =
+          grapeVarietiesFilter.length === 0 ||
+          grapeVarietiesFilter.some((value) => wineVarieties.some((item) => item.includes(value.toLowerCase())));
+        const matchesSearch = !normalizedSearch || haystack.includes(normalizedSearch);
         const matchesScore = !aboveFourOnly || wine.vivinoScore > 4;
 
-        return matchesProducer && matchesVintage && matchesRegion && matchesCountry && matchesScore;
+        return matchesProducer && matchesVintage && matchesRegion && matchesCountry && matchesGrapeVarieties && matchesSearch && matchesScore;
       }),
-    [aboveFourOnly, cellarWines, countryFilter, producerFilter, regionFilter, vintageFilter]
+    [aboveFourOnly, cellarWines, countryFilter, grapeVarietiesFilter, producerFilter, regionFilter, searchFilter, vintageFilter]
   );
 
   const producerMap = useMemo(
@@ -198,11 +232,22 @@ export function ProducerDirectory() {
               Clear filters
             </button>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <Input
+            placeholder="Search wine, producer, grape, or grape varieties"
+            value={searchFilter}
+            onChange={(event) => setSearchFilter(event.target.value)}
+          />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <FilterSelect label="Producer" values={producerFilter} options={producerOptions} onChange={setProducerFilter} />
             <FilterSelect label="Vintage" values={vintageFilter} options={vintageOptions} onChange={setVintageFilter} />
             <FilterSelect label="Region" values={regionFilter} options={regionOptions} onChange={setRegionFilter} />
             <FilterSelect label="Country" values={countryFilter} options={countryOptions} onChange={setCountryFilter} />
+            <FilterSelect
+              label="Grape varieties"
+              values={grapeVarietiesFilter}
+              options={grapeVarietiesOptions}
+              onChange={setGrapeVarietiesFilter}
+            />
           </div>
           <label className="flex items-center gap-3 rounded-3xl border border-border/70 bg-background/70 px-4 py-3 text-sm">
             <input
