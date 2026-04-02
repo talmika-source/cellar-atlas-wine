@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Camera, Pencil, Plus, RefreshCw, Trash2, Wine } from "lucide-react";
 
 import { KpiCard } from "@/components/cards/kpi-card";
@@ -272,6 +272,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [wineStatusById, setWineStatusById] = useState<Record<string, string>>({});
   const [isPending, startTransition] = useTransition();
+  const uploadScanInputRef = useRef<HTMLInputElement | null>(null);
+  const captureScanInputRef = useRef<HTMLInputElement | null>(null);
   const normalizedQuery = query.trim().toLowerCase();
 
   const readResponsePayload = async <T,>(response: Response) => {
@@ -705,8 +707,8 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
   };
 
   const generateDraftFromScan = () => {
-    if (!scanText.trim()) {
-      setScanError("Paste label text or OCR output first.");
+    if (!scanText.trim() && !scanImageUrl) {
+      setScanError("Paste OCR text, upload an image, or use Capture first.");
       return;
     }
 
@@ -728,9 +730,10 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
         return;
       }
 
-      const payload = (await response.json()) as { data?: Partial<WineBottle> };
+      const payload = (await response.json()) as { data?: Partial<WineBottle>; extractedText?: string };
 
       setForm(toFormState(payload.data ?? {}, locations));
+      setScanText(payload.extractedText ?? scanText);
       setEditingWine(null);
       setScanDialogOpen(false);
       resetScanAssist();
@@ -984,12 +987,32 @@ export function WineInventoryPanel({ query = "" }: { query?: string }) {
           <div className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Bottle image</p>
-              <input
-                className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-xl file:border-0 file:bg-secondary file:px-4 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-secondary/80"
-                type="file"
-                accept="image/*"
-                onChange={(event) => void updateScanImage(event.target.files?.[0] ?? null)}
-              />
+              <div className="flex flex-wrap gap-3">
+                <input
+                  ref={uploadScanInputRef}
+                  className="hidden"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => void updateScanImage(event.target.files?.[0] ?? null)}
+                />
+                <input
+                  ref={captureScanInputRef}
+                  className="hidden"
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(event) => void updateScanImage(event.target.files?.[0] ?? null)}
+                />
+                <Button type="button" variant="outline" onClick={() => uploadScanInputRef.current?.click()}>
+                  Upload image
+                </Button>
+                <Button type="button" variant="outline" onClick={() => captureScanInputRef.current?.click()}>
+                  Capture
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Capture opens the phone camera on supported mobile browsers, then OCR extracts the label text automatically.
+              </p>
             </div>
             {scanImageUrl ? <img src={scanImageUrl} alt="Scanned bottle preview" className="h-40 w-28 rounded-xl object-cover" /> : null}
             <Textarea
