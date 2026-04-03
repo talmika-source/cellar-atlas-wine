@@ -793,57 +793,9 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
       setScanError(null);
       const imageDataUrl = await readImageFile(file);
       setScanImageUrl(imageDataUrl);
-      setScanOcrStatus("Reading bottle label...");
-      setIsScanOcrPending(true);
-
-      const { recognize } = await import("tesseract.js");
-      const candidateImages = await buildOcrCandidateImages(imageDataUrl);
-      const candidateTexts = await Promise.all(
-        candidateImages.flatMap((candidateImage) => {
-          const processedCandidatePromise = preprocessImageForOcr(candidateImage);
-
-          return [
-            recognize(candidateImage, "eng").then((result) => {
-              const lineData = result.data as typeof result.data & { lines?: OcrLineLike[] };
-              const primaryLines = extractLargestOcrLines(lineData.lines, result.data.text);
-              const promotedText = extractPromisingOcrText(primaryLines.join("\n"));
-              const vintage = extractVintageCandidate(result.data.text);
-
-              return {
-                text: Array.from(new Set([...primaryLines, promotedText, vintage].filter(Boolean))).join(" ").trim(),
-                vintage,
-                score: scoreOcrText(promotedText || primaryLines.join(" "))
-              };
-            }),
-            processedCandidatePromise
-              .then((processedCandidateImage) => recognize(processedCandidateImage, "eng"))
-              .then((result) => {
-                const lineData = result.data as typeof result.data & { lines?: OcrLineLike[] };
-                const primaryLines = extractLargestOcrLines(lineData.lines, result.data.text);
-                const promotedText = extractPromisingOcrText(primaryLines.join("\n"));
-                const vintage = extractVintageCandidate(result.data.text);
-
-                return {
-                  text: Array.from(new Set([...primaryLines, promotedText, vintage].filter(Boolean))).join(" ").trim(),
-                  vintage,
-                  score: scoreOcrText(promotedText || primaryLines.join(" ")) + (vintage ? 50 : 0)
-                };
-              })
-          ];
-        })
-      );
-      const bestCandidate = candidateTexts.sort((left, right) => right.score - left.score)[0];
-      const extractedText = bestCandidate?.text.replace(/\s+/g, " ").trim() ?? "";
-
-      if (!extractedText) {
-        setScanOcrStatus("No readable label text was found. You can still type or paste text manually.");
-        return;
-      }
-
-      setScanText(extractedText);
-      setScanOcrStatus("Label text extracted. Review it if needed, then generate the draft.");
+      setScanOcrStatus("Bottle photo attached. Add optional notes if you want, then generate the draft.");
     } catch {
-      setScanError("Unable to read text from that bottle image.");
+      setScanError("Unable to load that bottle image.");
       setScanOcrStatus(null);
     } finally {
       setIsScanOcrPending(false);
@@ -1090,13 +1042,8 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
   };
 
   const generateDraftFromScan = () => {
-    if (isScanOcrPending) {
-      setScanError("OCR is still running. Please wait a moment and try again.");
-      return;
-    }
-
     if (!scanText.trim() && !scanImageUrl) {
-      setScanError("Paste OCR text, upload an image, or use Capture first.");
+      setScanError("Upload an image or use Capture first.");
       return;
     }
 
@@ -1115,7 +1062,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
 
       if (!response.ok) {
         const payload = await readResponsePayload<{ error?: string }>(response);
-        setScanError(payload.error ?? "Unable to generate a draft from that text.");
+        setScanError(payload.error ?? "Unable to generate a draft from that bottle image.");
         return;
       }
 
@@ -1403,7 +1350,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
           <DialogHeader>
             <DialogTitle>Scan Assist</DialogTitle>
             <DialogDescription>
-              Paste OCR text from a bottle photo or label scan. The app will draft the wine details for review before saving.
+              Capture or upload a bottle image, then open a draft with the photo attached for manual review and completion.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1433,7 +1380,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Capture opens the phone camera on supported mobile browsers, then OCR extracts the label text automatically.
+                Capture opens the phone camera on supported mobile browsers and attaches the bottle photo to a draft.
               </p>
             </div>
             {scanImageUrl ? (
@@ -1449,14 +1396,14 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
               </div>
             ) : null}
             <Textarea
-              placeholder="Example: Domaine Tempier Bandol Rouge 2019 Mourvedre France"
+              placeholder="Optional notes from the bottle label"
               value={scanText}
               onChange={(event) => setScanText(event.target.value)}
             />
             {scanOcrStatus ? <p className="text-sm text-muted-foreground">{scanOcrStatus}</p> : null}
             {scanError ? <p className="text-sm text-rose-500">{scanError}</p> : null}
-            <Button onClick={generateDraftFromScan} disabled={isPending || isScanOcrPending}>
-              {isScanOcrPending ? "Reading Label..." : "Generate Draft"}
+            <Button onClick={generateDraftFromScan} disabled={isPending}>
+              Generate Draft
             </Button>
           </div>
         </DialogContent>
