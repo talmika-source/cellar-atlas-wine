@@ -107,39 +107,39 @@ export function WineOverview() {
       </section>
 
       <section>
-        <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(92,20,35,0.95),rgba(47,16,23,0.92))] text-white">
+        <Card className="overflow-hidden bg-[linear-gradient(135deg,rgba(11,23,43,0.98),rgba(17,31,56,0.95))] text-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-rose-100/80">Cellar Snapshot</CardDescription>
+            <CardDescription className="text-slate-200/80">Cellar Snapshot</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
-              <div className="flex items-center gap-2 text-sm text-rose-100/80">
+              <div className="flex items-center gap-2 text-sm text-slate-200/80">
                 <Snowflake className="h-4 w-4" />
                 Storage utilization
               </div>
               <p className="mt-3 text-3xl font-semibold">{totalCapacity ? Math.round((totalOccupied / totalCapacity) * 100) : 0}%</p>
-              <p className="mt-2 text-sm text-rose-100/80">
+              <p className="mt-2 text-sm text-slate-200/80">
                 {totalOccupied} bottles tracked across {locations.length} storage zones.
               </p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
-              <div className="flex items-center gap-2 text-sm text-rose-100/80">
+              <div className="flex items-center gap-2 text-sm text-slate-200/80">
                 <Clock3 className="h-4 w-4" />
                 Peak Bottles
               </div>
               <p className="mt-3 text-3xl font-semibold">{peakBottles}</p>
-              <p className="mt-2 text-sm text-rose-100/80">Only bottles currently marked as peak maturity are counted here.</p>
+              <p className="mt-2 text-sm text-slate-200/80">Only bottles currently marked as peak maturity are counted here.</p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
-              <div className="flex items-center gap-2 text-sm text-rose-100/80">
+              <div className="flex items-center gap-2 text-sm text-slate-200/80">
                 <Star className="h-4 w-4" />
                 Portfolio score
               </div>
               <p className="mt-3 text-3xl font-semibold">{averageScore}</p>
-              <p className="mt-2 text-sm text-rose-100/80">{averageScoreLabel}</p>
+              <p className="mt-2 text-sm text-slate-200/80">{averageScoreLabel}</p>
             </div>
             <div className="rounded-3xl border border-white/15 bg-white/10 p-4">
-              <div className="flex items-center gap-2 text-sm text-rose-100/80">
+              <div className="flex items-center gap-2 text-sm text-slate-200/80">
                 <ArrowUpRight className="h-4 w-4" />
                 Top countries
               </div>
@@ -148,13 +148,13 @@ export function WineOverview() {
                   topCountries.map(([country, count]) => (
                     <div key={country} className="flex items-center justify-between gap-3 text-sm">
                       <span className="truncate text-white">{country}</span>
-                      <span className="shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-rose-50">
+                      <span className="shrink-0 rounded-full bg-teal-400/15 px-2.5 py-1 text-xs font-medium text-teal-100 ring-1 ring-teal-300/20">
                         {count} {count === 1 ? "wine" : "wines"}
                       </span>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-rose-100/80">Add wines with country data to see your top regions represented here.</p>
+                  <p className="text-sm text-slate-200/80">Add wines with country data to see your top regions represented here.</p>
                 )}
               </div>
             </div>
