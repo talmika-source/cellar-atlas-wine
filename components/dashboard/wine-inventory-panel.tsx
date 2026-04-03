@@ -1468,7 +1468,13 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
           const placement = formatWinePlacement(wine.shelf, wine.slot);
 
           return (
-            <Card key={wine.id}>
+            <Card
+              key={wine.id}
+              style={{
+                contentVisibility: "auto",
+                containIntrinsicSize: "520px"
+              }}
+            >
               <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
                   <CardDescription>{headerMeta}</CardDescription>
