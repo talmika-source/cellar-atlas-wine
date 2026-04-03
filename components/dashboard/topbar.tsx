@@ -39,7 +39,7 @@ export function Topbar() {
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-[1.75rem] border border-border/80 bg-card/80 p-4 backdrop-blur md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-4 rounded-[1.75rem] border border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,251,255,0.9),rgba(239,245,250,0.86))] p-4 backdrop-blur md:flex-row md:items-center md:justify-between">
       <div className="relative w-full max-w-xl">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
@@ -64,7 +64,7 @@ export function Topbar() {
           </Link>
         </Button>
         <Avatar>
-          <AvatarFallback>TA</AvatarFallback>
+          <AvatarFallback className="bg-slate-900 text-slate-100">TA</AvatarFallback>
         </Avatar>
       </div>
     </div>

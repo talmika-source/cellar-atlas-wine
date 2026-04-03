@@ -3,24 +3,24 @@
 @tailwind utilities;
 
 :root {
-  --background: 24 38% 97%;
-  --foreground: 346 25% 16%;
-  --card: 0 0% 100%;
-  --card-foreground: 346 25% 16%;
-  --border: 28 22% 84%;
-  --input: 28 22% 84%;
-  --primary: 348 57% 31%;
+  --background: 210 38% 96%;
+  --foreground: 216 39% 14%;
+  --card: 210 33% 99%;
+  --card-foreground: 216 39% 14%;
+  --border: 213 20% 82%;
+  --input: 213 20% 82%;
+  --primary: 187 78% 38%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 35 45% 94%;
-  --secondary-foreground: 346 25% 16%;
-  --muted: 35 38% 94%;
-  --muted-foreground: 18 15% 40%;
-  --accent: 50 55% 88%;
-  --accent-foreground: 31 65% 24%;
-  --ring: 348 57% 31%;
-  --success: 148 55% 30%;
-  --warning: 30 88% 42%;
-  --danger: 0 84% 55%;
+  --secondary: 214 24% 91%;
+  --secondary-foreground: 216 39% 18%;
+  --muted: 214 28% 93%;
+  --muted-foreground: 216 15% 40%;
+  --accent: 191 42% 88%;
+  --accent-foreground: 205 72% 22%;
+  --ring: 187 78% 38%;
+  --success: 163 64% 33%;
+  --warning: 34 88% 48%;
+  --danger: 0 74% 54%;
   --font-sans: "Aptos", "Segoe UI", sans-serif;
   --font-serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }
@@ -53,9 +53,9 @@
 body {
   @apply bg-background text-foreground antialiased;
   background-image:
-    radial-gradient(circle at top left, rgba(127, 29, 29, 0.12), transparent 24rem),
-    radial-gradient(circle at top right, rgba(180, 83, 9, 0.1), transparent 26rem),
-    linear-gradient(180deg, rgba(255, 251, 245, 0.95), rgba(247, 241, 235, 0.8));
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 24rem),
+    radial-gradient(circle at top right, rgba(100, 116, 139, 0.16), transparent 28rem),
+    linear-gradient(180deg, rgba(244, 248, 252, 0.98), rgba(231, 238, 245, 0.92));
   font-family: var(--font-sans);
   min-height: 100vh;
 }
