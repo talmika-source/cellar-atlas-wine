@@ -1,5 +1,6 @@
 "use client";
 
+import NextImage from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Camera, Pencil, Plus, RefreshCw, Trash2, Wine } from "lucide-react";
 
@@ -1264,7 +1265,16 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
               </div>
               {form.imageUrl ? (
                 <div className="flex items-start gap-4 rounded-2xl border border-border/80 bg-secondary/40 p-3">
-                  <img src={form.imageUrl} alt="Bottle preview" className="h-32 w-24 rounded-xl object-cover" />
+                  <div className="relative h-32 w-24 shrink-0 overflow-hidden rounded-xl">
+                    <NextImage
+                      src={form.imageUrl}
+                      alt="Bottle preview"
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
                   <Button type="button" variant="ghost" onClick={() => updateForm("imageUrl", "")}>
                     Remove image
                   </Button>
@@ -1425,7 +1435,18 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
                 Capture opens the phone camera on supported mobile browsers, then OCR extracts the label text automatically.
               </p>
             </div>
-            {scanImageUrl ? <img src={scanImageUrl} alt="Scanned bottle preview" className="h-40 w-28 rounded-xl object-cover" /> : null}
+            {scanImageUrl ? (
+              <div className="relative h-40 w-28 overflow-hidden rounded-xl">
+                <NextImage
+                  src={scanImageUrl}
+                  alt="Scanned bottle preview"
+                  fill
+                  sizes="112px"
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : null}
             <Textarea
               placeholder="Example: Domaine Tempier Bandol Rouge 2019 Mourvedre France"
               value={scanText}
@@ -1465,7 +1486,16 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
               <CardContent className="space-y-4">
                 {wine.imageUrl ? (
                   <div className="flex justify-start">
-                    <img src={wine.imageUrl} alt={getWineDisplayTitle(wine)} className="h-48 w-32 rounded-2xl object-cover shadow-sm" />
+                    <div className="relative h-48 w-32 shrink-0 overflow-hidden rounded-2xl shadow-sm">
+                      <NextImage
+                        src={wine.imageUrl}
+                        alt={getWineDisplayTitle(wine)}
+                        fill
+                        sizes="(max-width: 768px) 128px, 128px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
                   </div>
                 ) : null}
                 <div className="grid gap-3 md:grid-cols-4">
