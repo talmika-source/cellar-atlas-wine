@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 
-import { Building2, LayoutDashboard, MapPin, Package } from "lucide-react";
+import { Activity, Building2, LayoutDashboard, MapPin, Package } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,11 @@ const navItems = [
     title: "Producers",
     href: "/dashboard/producers" as Route,
     icon: Building2
+  },
+  {
+    title: "Monitoring",
+    href: "/dashboard/monitoring" as Route,
+    icon: Activity
   }
 ];
 
