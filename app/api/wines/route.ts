@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorSession } from "@/lib/editor-auth";
 import { buildVivinoSearchUrl, createWine, enrichWineWithExternalScores, listWines, type WineInput } from "@/lib/wine-store";
 import { getLocation } from "@/lib/locations-store";
 import { type ValidatedWineInput, validateWineInput } from "@/lib/wine-validation";
@@ -16,6 +17,12 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const authError = requireEditorSession();
+
+  if (authError) {
+    return authError;
+  }
+
   try {
     const body = (await request.json()) as Partial<WineInput>;
     const validated = validateWineInput(body);

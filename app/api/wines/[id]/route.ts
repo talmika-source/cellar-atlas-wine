@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorSession } from "@/lib/editor-auth";
 import { buildVivinoSearchUrl, deleteWine, enrichWineWithExternalScores, getWine, updateWine, type WineInput } from "@/lib/wine-store";
 import { inferReadinessFromVintage } from "@/lib/wine-readiness";
 import { getLocation } from "@/lib/locations-store";
 import { validateWineInput } from "@/lib/wine-validation";
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  const authError = requireEditorSession();
+
+  if (authError) {
+    return authError;
+  }
+
   const patch = (await request.json()) as Record<string, unknown>;
   const currentWine = await getWine(params.id);
 
@@ -115,6 +122,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const authError = requireEditorSession();
+
+  if (authError) {
+    return authError;
+  }
+
   const deleted = await deleteWine(params.id);
 
   if (!deleted) {

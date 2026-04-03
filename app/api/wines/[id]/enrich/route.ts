@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorSession } from "@/lib/editor-auth";
 import { enrichWineWithExternalScores, ExternalScoringUnavailableError, getWine, updateWine } from "@/lib/wine-store";
 import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
 
 export async function POST(_request: Request, { params }: { params: { id: string } }) {
+  const authError = requireEditorSession();
+
+  if (authError) {
+    return authError;
+  }
+
   try {
     const currentWine = await getWine(params.id);
 
