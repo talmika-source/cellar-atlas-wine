@@ -227,7 +227,7 @@ export function ProducerDirectory() {
     <div className="space-y-6">
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Producers</p>
-        <h2 className="text-3xl font-semibold tracking-tight">See where the cellar is concentrated by producer and style.</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Celler Analysis</h2>
       </section>
 
       <Card>

@@ -171,7 +171,7 @@ export function StorageLocationsPanel() {
     <div className="space-y-6">
       <section className="space-y-2">
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Locations</p>
-        <h2 className="text-3xl font-semibold tracking-tight">Manage Fridges and Storage zones.</h2>
+        <h2 className="text-3xl font-semibold tracking-tight">Manage Fridges and Storage</h2>
       </section>
 
       <Card>
@@ -252,7 +252,7 @@ export function StorageLocationsPanel() {
                     <p className="mt-2 text-2xl font-semibold">{location.capacity}</p>
                   </div>
                   <div className="rounded-3xl bg-secondary/60 p-4">
-                    <p className="text-sm text-muted-foreground">Tracked bottles</p>
+                    <p className="text-sm text-muted-foreground">Bottles</p>
                     <p className="mt-2 text-2xl font-semibold">{bottleCount}</p>
                   </div>
                   <div className="rounded-3xl bg-secondary/60 p-4">

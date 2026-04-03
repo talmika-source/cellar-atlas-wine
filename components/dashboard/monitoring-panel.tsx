@@ -117,7 +117,7 @@ export function MonitoringPanel() {
         <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Monitoring</p>
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
-            <h2 className="text-3xl font-semibold tracking-tight">Watch database health and inventory signals.</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">Platform Health Indicators</h2>
             <p className="text-sm text-muted-foreground">
               Use this page to confirm the live database is reachable, your wine counts still look right, and fallback risk is visible before data loss scares you again.
             </p>
