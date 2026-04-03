@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { type WineBottle } from "@/lib/wine-data";
+import { isCellarWine, type WineBottle } from "@/lib/wine-data";
 
 export function WineReportPanel() {
   const [wines, setWines] = useState<WineBottle[]>([]);
@@ -41,9 +41,11 @@ export function WineReportPanel() {
     void load();
   }, []);
 
+  const cellarWines = useMemo(() => wines.filter(isCellarWine), [wines]);
+
   const sortedWines = useMemo(
     () =>
-      [...wines].sort((left, right) => {
+      [...cellarWines].sort((left, right) => {
         const producerCompare = left.producer.localeCompare(right.producer);
 
         if (producerCompare !== 0) {
@@ -58,7 +60,15 @@ export function WineReportPanel() {
 
         return (right.vintage ?? 0) - (left.vintage ?? 0);
       }),
-    [wines]
+    [cellarWines]
+  );
+
+  const totals = useMemo(
+    () => ({
+      bottles: sortedWines.reduce((sum, wine) => sum + wine.quantity, 0),
+      value: sortedWines.reduce((sum, wine) => sum + wine.estimatedValue * wine.quantity, 0)
+    }),
+    [sortedWines]
   );
 
   return (
@@ -71,7 +81,7 @@ export function WineReportPanel() {
       <Card>
         <CardHeader>
           <CardDescription>Inventory table</CardDescription>
-          <CardTitle>Wine producer / wine name / Vintage / Region / Country / Quantity / Estimated Value / Vivino Score</CardTitle>
+          <CardTitle>In-cellar wine report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {error ? (
@@ -101,7 +111,7 @@ export function WineReportPanel() {
                     <TableCell>{wine.region || "—"}</TableCell>
                     <TableCell>{wine.country || "—"}</TableCell>
                     <TableCell className="text-right">{wine.quantity}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(wine.estimatedValue)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(wine.estimatedValue * wine.quantity)}</TableCell>
                     <TableCell className="text-right">{wine.vivinoScore > 0 ? wine.vivinoScore.toFixed(1) : "—"}</TableCell>
                   </TableRow>
                 ))}
@@ -114,6 +124,17 @@ export function WineReportPanel() {
                 ) : null}
               </TableBody>
             </Table>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-3xl bg-secondary/60 p-4">
+              <p className="text-sm text-muted-foreground">Total bottles in cellar</p>
+              <p className="mt-2 text-2xl font-semibold">{totals.bottles}</p>
+            </div>
+            <div className="rounded-3xl bg-secondary/60 p-4">
+              <p className="text-sm text-muted-foreground">Total estimated cellar value</p>
+              <p className="mt-2 text-2xl font-semibold">{formatCurrency(totals.value)}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
