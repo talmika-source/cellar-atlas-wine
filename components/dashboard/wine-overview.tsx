@@ -1,49 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ArrowUpRight, Clock3, Snowflake, Star } from "lucide-react";
 
 import { KpiCard } from "@/components/cards/kpi-card";
+import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWineDisplayTitle, hasVintageInWineName } from "@/lib/wine-display";
 import { formatWinePlacement } from "@/lib/wine-location-display";
 import { getVivinoPortfolioScore } from "@/lib/wine-score";
 import { formatCurrency } from "@/lib/utils";
-import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
+import { isCellarWine, type WineBottle } from "@/lib/wine-data";
 
 export function WineOverview() {
-  const [wines, setWines] = useState<WineBottle[]>([]);
-  const [locations, setLocations] = useState<StorageLocation[]>([]);
-
-  const readResponsePayload = async <T,>(response: Response) => {
-    const text = await response.text();
-
-    if (!text) {
-      return {} as T;
-    }
-
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return {} as T;
-    }
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      const [wineResponse, locationResponse] = await Promise.all([
-        fetch("/api/wines", { cache: "no-store" }),
-        fetch("/api/locations", { cache: "no-store" })
-      ]);
-
-      const winePayload = wineResponse.ok ? await readResponsePayload<{ data?: WineBottle[] }>(wineResponse) : {};
-      const locationPayload = locationResponse.ok ? await readResponsePayload<{ data?: StorageLocation[] }>(locationResponse) : {};
-      setWines(winePayload.data ?? []);
-      setLocations(locationPayload.data ?? []);
-    };
-
-    void load();
-  }, []);
+  const { wines, locations } = useDashboardData();
 
   const {
     totalBottles,

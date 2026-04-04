@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
+import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { formatWinePlacement } from "@/lib/wine-location-display";
 import { getWineDisplayTitle } from "@/lib/wine-display";
-import { isCellarWine, type StorageLocation, type WineBottle } from "@/lib/wine-data";
+import { isCellarWine, type StorageLocation } from "@/lib/wine-data";
 
 type LocationFormState = {
   name: string;
@@ -50,43 +51,34 @@ function toFormState(location: StorageLocation | null): LocationFormState {
 }
 
 export function StorageLocationsPanel() {
-  const [wines, setWines] = useState<WineBottle[]>([]);
-  const [locations, setLocations] = useState<StorageLocation[]>([]);
+  const {
+    wines,
+    locations,
+    winesError,
+    locationsError,
+    refreshLocations,
+    upsertLocation,
+    removeLocationFromState
+  } = useDashboardData();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLocation, setEditingLocation] = useState<StorageLocation | null>(null);
   const [form, setForm] = useState<LocationFormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const readResponsePayload = async (response: Response) => {
+  const readResponsePayload = async <T,>(response: Response) => {
     const text = await response.text();
 
     if (!text) {
-      return {};
+      return {} as T;
     }
 
     try {
-      return JSON.parse(text) as { error?: string };
+      return JSON.parse(text) as T;
     } catch {
-      return { error: "The server returned an invalid response." };
+      return { error: "The server returned an invalid response." } as T;
     }
   };
-
-  const load = async () => {
-    const [wineResponse, locationResponse] = await Promise.all([
-      fetch("/api/wines", { cache: "no-store" }),
-      fetch("/api/locations", { cache: "no-store" })
-    ]);
-
-    const winePayload = (wineResponse.ok ? await readResponsePayload(wineResponse) : {}) as { data?: WineBottle[] };
-    const locationPayload = (locationResponse.ok ? await readResponsePayload(locationResponse) : {}) as { data?: StorageLocation[] };
-    setWines(winePayload.data ?? []);
-    setLocations(locationPayload.data ?? []);
-  };
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   const updateForm = (key: keyof LocationFormState, value: string) => {
     setForm((current) => ({
@@ -133,14 +125,18 @@ export function StorageLocationsPanel() {
         })
       });
 
-      const payload = await readResponsePayload(response);
+      const payload = await readResponsePayload<{ data?: StorageLocation; error?: string }>(response);
 
       if (!response.ok) {
         setError(payload.error ?? "Unable to save location.");
         return;
       }
 
-      await load();
+      if (payload.data) {
+        upsertLocation(payload.data);
+      } else {
+        await refreshLocations();
+      }
       setDialogOpen(false);
       setEditingLocation(null);
       setForm(emptyForm);
@@ -156,16 +152,19 @@ export function StorageLocationsPanel() {
 
     startTransition(async () => {
       const response = await fetch(`/api/locations/${location.id}`, { method: "DELETE" });
-      const payload = await readResponsePayload(response);
+      const payload = await readResponsePayload<{ error?: string }>(response);
 
       if (!response.ok) {
         setError(payload.error ?? "Unable to delete location.");
         return;
       }
 
-      await load();
+      removeLocationFromState(location.id);
+      await refreshLocations().catch(() => undefined);
     });
   };
+
+  const panelError = error ?? locationsError ?? winesError;
 
   return (
     <div className="space-y-6">
@@ -212,7 +211,7 @@ export function StorageLocationsPanel() {
               <Input placeholder="Humidity %" value={form.humidity} onChange={(event) => updateForm("humidity", event.target.value)} />
             </div>
             <Textarea placeholder="Notes" value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} />
-            {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+            {panelError ? <p className="text-sm text-rose-500">{panelError}</p> : null}
             <Button onClick={submitLocation} disabled={isPending}>
               {editingLocation ? "Save Location" : "Create Location"}
             </Button>

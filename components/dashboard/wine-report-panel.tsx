@@ -1,45 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 
+import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { isCellarWine, type WineBottle } from "@/lib/wine-data";
+import { isCellarWine } from "@/lib/wine-data";
 
 export function WineReportPanel() {
-  const [wines, setWines] = useState<WineBottle[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      const response = await fetch("/api/wines", { cache: "no-store" });
-      const text = await response.text();
-
-      if (!text) {
-        setWines([]);
-        return;
-      }
-
-      try {
-        const payload = JSON.parse(text) as { data?: WineBottle[]; error?: string };
-
-        if (!response.ok) {
-          setError(payload.error ?? "Unable to load the wine report.");
-          setWines([]);
-          return;
-        }
-
-        setError(null);
-        setWines(payload.data ?? []);
-      } catch {
-        setError("The server returned an invalid wine report response.");
-        setWines([]);
-      }
-    };
-
-    void load();
-  }, []);
+  const { wines, winesError } = useDashboardData();
 
   const cellarWines = useMemo(() => wines.filter(isCellarWine), [wines]);
 
@@ -84,8 +54,8 @@ export function WineReportPanel() {
           <CardTitle>In-cellar wine report</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+          {winesError ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{winesError}</div>
           ) : null}
 
           <div className="overflow-x-auto rounded-[1.25rem] border border-border/80">

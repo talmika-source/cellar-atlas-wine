@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
+import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -54,7 +55,7 @@ function FilterSelect({
 }
 
 export function ProducerDirectory() {
-  const [wines, setWines] = useState<WineBottle[]>([]);
+  const { wines } = useDashboardData();
   const [searchFilter, setSearchFilter] = useState("");
   const [producerFilter, setProducerFilter] = useState<string[]>([]);
   const [vintageFilter, setVintageFilter] = useState<string[]>([]);
@@ -72,30 +73,6 @@ export function ProducerDirectory() {
     setGrapeVarietiesFilter([]);
     setAboveFourOnly(false);
   };
-
-  const readResponsePayload = async <T,>(response: Response) => {
-    const text = await response.text();
-
-    if (!text) {
-      return {} as T;
-    }
-
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return {} as T;
-    }
-  };
-
-  useEffect(() => {
-    const load = async () => {
-      const response = await fetch("/api/wines", { cache: "no-store" });
-      const payload = response.ok ? await readResponsePayload<{ data?: WineBottle[] }>(response) : {};
-      setWines(payload.data ?? []);
-    };
-
-    void load();
-  }, []);
 
   const cellarWines = useMemo(() => wines.filter(isCellarWine), [wines]);
 

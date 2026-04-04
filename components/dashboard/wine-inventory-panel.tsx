@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Camera, Pencil, Plus, RefreshCw, Trash2, Wine } from "lucide-react";
 
 import { KpiCard } from "@/components/cards/kpi-card";
+import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -536,8 +537,16 @@ async function buildOcrCandidateImages(dataUrl: string) {
 }
 
 export function WineInventoryPanel({ query = "", action }: { query?: string; action?: string }) {
-  const [wines, setWines] = useState<WineBottle[]>([]);
-  const [locations, setLocations] = useState<StorageLocation[]>([]);
+  const {
+    wines,
+    locations,
+    winesError,
+    locationsError,
+    refreshWines,
+    refreshLocations,
+    upsertWine,
+    removeWineFromState
+  } = useDashboardData();
   const [inventoryTab, setInventoryTab] = useState<"cellar" | "drank">("cellar");
   const [locationFilter, setLocationFilter] = useState("all");
   const [readinessFilter, setReadinessFilter] = useState<"all" | WineBottle["readiness"]>("all");
@@ -570,21 +579,6 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
     } catch {
       return { error: "The server returned an invalid response." } as T;
     }
-  };
-
-  const mergeWineIntoState = (updatedWine: WineBottle) => {
-    setWines((current) => {
-      const next = [...current];
-      const index = next.findIndex((wine) => wine.id === updatedWine.id);
-
-      if (index === -1) {
-        next.unshift(updatedWine);
-        return next;
-      }
-
-      next[index] = updatedWine;
-      return next;
-    });
   };
 
   const buildNoScoreMessage = (entries: EnrichmentDebugEntry[]) => {
@@ -630,47 +624,16 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
     });
   };
 
-  const loadWines = async () => {
-    const response = await fetch("/api/wines", { cache: "no-store" });
-    const payload = await readResponsePayload<{ data?: WineBottle[]; error?: string }>(response);
-
-    if (!response.ok) {
-      setError(payload.error ?? "Unable to load wines.");
-      setWines([]);
-      return;
-    }
-
-    setError(null);
-    setWines(payload.data ?? []);
-  };
-
-  const loadLocations = async () => {
-    const response = await fetch("/api/locations", { cache: "no-store" });
-    const payload = await readResponsePayload<{ data?: StorageLocation[]; error?: string }>(response);
-
-    if (!response.ok) {
-      setError((current) => current ?? payload.error ?? "Unable to load storage locations.");
-      setLocations([]);
-      return;
-    }
-
-    const nextLocations = payload.data ?? [];
-    setLocations(nextLocations);
-
+  useEffect(() => {
     setForm((current) =>
-      current.locationId || nextLocations.length === 0
+      current.locationId || locations.length === 0
         ? current
         : {
             ...current,
-            locationId: nextLocations[0].id
+            locationId: locations[0].id
           }
     );
-  };
-
-  useEffect(() => {
-    void loadWines();
-    void loadLocations();
-  }, []);
+  }, [locations]);
 
   useEffect(() => {
     if (action === "scan") {
@@ -721,6 +684,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
   );
 
   const visibleWines = inventoryTab === "cellar" ? filteredCellarWines : filteredDrankWines;
+  const visibleError = error ?? winesError ?? locationsError;
 
   const analyticsWines = inventoryTab === "cellar" ? filteredCellarWines : filteredDrankWines;
   const totalBottles = analyticsWines.reduce((sum, wine) => sum + wine.quantity, 0);
@@ -898,7 +862,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
       const payload = await readResponsePayload<{ data?: WineBottle }>(response);
       const savedWine = payload.data;
 
-      await Promise.all([loadWines(), loadLocations()]);
+      await Promise.all([refreshWines(), refreshLocations()]).catch(() => undefined);
       setDialogOpen(false);
       resetForm();
 
@@ -912,7 +876,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
             const enrichPayload = await readResponsePayload<{ data?: WineBottle; debug?: EnrichmentDebugEntry[] }>(enrichResponse);
 
             if (enrichPayload.data) {
-              mergeWineIntoState(enrichPayload.data);
+              upsertWine(enrichPayload.data);
             }
 
             if (
@@ -926,8 +890,6 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
             } else if (enrichPayload.data && enrichPayload.data.grapeVarieties && !enrichPayload.data.vivinoScore && !hasManualCriticScores && !hasManualVivinoScore) {
               setStatusMessage("Wine saved. Grape varieties were enriched automatically.");
             }
-
-            await loadWines();
             return;
           }
 
@@ -960,7 +922,8 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
     startTransition(async () => {
       setStatusMessage(null);
       await fetch(`/api/wines/${wine.id}`, { method: "DELETE" });
-      await Promise.all([loadWines(), loadLocations()]);
+      removeWineFromState(wine.id);
+      await refreshLocations().catch(() => undefined);
     });
   };
 
@@ -989,7 +952,8 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
         return;
       }
 
-      await Promise.all([loadWines(), loadLocations()]);
+      await refreshWines().catch(() => undefined);
+      await refreshLocations().catch(() => undefined);
       setInventoryTab("drank");
     });
   };
@@ -1012,7 +976,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
       const payload = await readResponsePayload<{ data?: WineBottle; debug?: EnrichmentDebugEntry[] }>(response);
 
       if (payload.data) {
-        mergeWineIntoState(payload.data);
+        upsertWine(payload.data);
       }
 
       if (
@@ -1036,8 +1000,6 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
         setStatusMessage(message);
         setWineStatus(wine.id, message);
       }
-
-      await loadWines();
     });
   };
 
@@ -1101,9 +1063,9 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
         </Button>
       </div>
 
-      {error ? (
+      {visibleError ? (
         <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
+          {visibleError}
         </div>
       ) : null}
 
@@ -1328,7 +1290,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
               <Input type="date" value={form.acquiredOn} onChange={(event) => updateForm("acquiredOn", event.target.value)} />
             </div>
             <Textarea placeholder="Notes" value={form.notes} onChange={(event) => updateForm("notes", event.target.value)} />
-            {error ? <p className="text-sm text-rose-500">{error}</p> : null}
+            {visibleError ? <p className="text-sm text-rose-500">{visibleError}</p> : null}
             <Button onClick={submitWine} disabled={isPending}>
               {editingWine ? "Save Changes" : "Create Wine"}
             </Button>

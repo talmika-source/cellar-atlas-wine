@@ -1,7 +1,9 @@
+import { DashboardDataProvider } from "@/components/dashboard/dashboard-data-provider";
+
 export default function DashboardLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return <DashboardDataProvider>{children}</DashboardDataProvider>;
 }
