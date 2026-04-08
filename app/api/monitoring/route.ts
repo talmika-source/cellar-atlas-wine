@@ -1,6 +1,7 @@
 import { WineCellarStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { backupStoreConfigured, listDatabaseBackups } from "@/lib/backup-store";
 import { prisma } from "@/lib/db/prisma";
 import { readStoredLocations, readStoredWines } from "@/lib/wine-file-store";
 
@@ -37,6 +38,8 @@ export async function GET() {
     fileLocationRecords: storedLocations.length,
     active: !databaseConfigured
   };
+  const backupsEnabled = backupStoreConfigured();
+  const backups = backupsEnabled ? await listDatabaseBackups(10).catch(() => []) : [];
 
   const alerts: MonitoringAlert[] = [];
 
@@ -73,6 +76,11 @@ export async function GET() {
         manualVivinoOverrides: storedWines.filter((wine) => wine.vivinoScoreSource === "Manual").length
       },
       fallback,
+      backups: {
+        configured: backupsEnabled,
+        latest: backups[0] ?? null,
+        recent: backups
+      },
       alerts
     });
   }
@@ -107,6 +115,20 @@ export async function GET() {
       });
     }
 
+    if (!backupsEnabled) {
+      alerts.push({
+        severity: "warning",
+        title: "Automatic backups not configured",
+        detail: "Connect Vercel Blob and add BLOB_READ_WRITE_TOKEN to enable scheduled backups and restore points."
+      });
+    } else if (backups.length === 0) {
+      alerts.push({
+        severity: "warning",
+        title: "No backups found yet",
+        detail: "Automatic backup storage is configured, but no snapshots are stored yet. Trigger a manual backup or wait for the nightly cron."
+      });
+    }
+
     return NextResponse.json({
       ok: true,
       checkedAt,
@@ -128,6 +150,11 @@ export async function GET() {
         manualVivinoOverrides
       },
       fallback,
+      backups: {
+        configured: backupsEnabled,
+        latest: backups[0] ?? null,
+        recent: backups
+      },
       alerts
     });
   } catch (error) {
@@ -169,6 +196,11 @@ export async function GET() {
           manualVivinoOverrides: 0
         },
         fallback,
+        backups: {
+          configured: backupsEnabled,
+          latest: backups[0] ?? null,
+          recent: backups
+        },
         alerts
       },
       { status: 503 }

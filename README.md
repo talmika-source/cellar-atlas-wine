@@ -34,6 +34,8 @@ Important hosting note:
 Online scoring note:
 - For Vercel or other serverless hosts, use Postgres plus environment variables for online enrichment.
 - `DATABASE_URL` should point to your Postgres database.
+- `BLOB_READ_WRITE_TOKEN` enables automatic backup snapshots to Vercel Blob.
+- `CRON_SECRET` protects the nightly Vercel cron backup route.
 - `LWIN_API_URL` + `LWIN_API_KEY` and `OPEN_WINE_DATA_API_URL` + `OPEN_WINE_DATA_API_KEY` can enrich missing metadata like region, country, grape, and style.
 - `APIFY_API_TOKEN` enables Apify-based Vivino score extraction for wines that already have a direct Vivino bottle URL.
 - `APIFY_VIVINO_ACTOR_ID` is optional; when omitted, the app defaults to `mrbridge~vivino-ratings-scraper-from-url-list`.
@@ -47,6 +49,7 @@ Current production recommendation:
 - Use direct `Global Wine Score` for score enrichment.
 - Use `LWIN` and `Open Wine Data` for metadata only.
 - Use Apify for Vivino score extraction when a direct Vivino bottle URL is available, and keep manual score override when needed.
+- Use Vercel Blob + the built-in Monitoring page for automatic nightly backup snapshots and guided restore.
 - RapidAPI score providers are intentionally not part of the active production refresh flow because they proved unreliable on free tiers.
 
 Best deployment targets right now:
