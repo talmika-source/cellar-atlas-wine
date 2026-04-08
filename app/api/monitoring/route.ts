@@ -5,6 +5,9 @@ import { backupStoreConfigured, listDatabaseBackups } from "@/lib/backup-store";
 import { prisma } from "@/lib/db/prisma";
 import { readStoredLocations, readStoredWines } from "@/lib/wine-file-store";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 type MonitoringAlert = {
   severity: "info" | "warning" | "error";
   title: string;

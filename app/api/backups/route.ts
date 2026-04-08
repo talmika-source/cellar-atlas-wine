@@ -3,6 +3,9 @@ import { NextResponse } from "next/server";
 import { backupStoreConfigured, createDatabaseBackup, listDatabaseBackups } from "@/lib/backup-store";
 import { requireEditorSession } from "@/lib/editor-auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   try {
     const backups = await listDatabaseBackups(20);
