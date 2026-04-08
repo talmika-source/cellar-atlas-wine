@@ -11,6 +11,12 @@ type DashboardDataContextValue = {
   locationsLoading: boolean;
   winesError: string | null;
   locationsError: string | null;
+  databaseIssue: {
+    active: boolean;
+    title: string;
+    message: string | null;
+    guidance: string | null;
+  };
   refreshWines: () => Promise<WineBottle[]>;
   refreshLocations: () => Promise<StorageLocation[]>;
   refreshAll: () => Promise<void>;
@@ -34,6 +40,28 @@ async function readResponsePayload<T>(response: Response) {
   } catch {
     return { error: "The server returned an invalid response." } as T;
   }
+}
+
+function inferDatabaseGuidance(message: string | null) {
+  if (!message) {
+    return null;
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("monthly free plan limit") || normalized.includes("network transfer allowance") || normalized.includes("paused")) {
+    return "Your Neon project may be paused after hitting its plan limit. Resume or upgrade the Neon project, then retry from Monitoring.";
+  }
+
+  if (normalized.includes("can't reach database server") || normalized.includes("timed out") || normalized.includes("unreachable")) {
+    return "The database is configured but currently unreachable. Check Neon project status, branch, and network availability.";
+  }
+
+  if (normalized.includes("authentication failed") || normalized.includes("password")) {
+    return "The database credentials may be invalid. Recheck the Production DATABASE_URL in Vercel.";
+  }
+
+  return "The database could not be read. Open Monitoring for recovery steps and a live health check.";
 }
 
 export function DashboardDataProvider({ children }: { children: React.ReactNode }) {
@@ -147,6 +175,12 @@ export function DashboardDataProvider({ children }: { children: React.ReactNode 
     locationsLoading,
     winesError,
     locationsError,
+    databaseIssue: {
+      active: Boolean(winesError || locationsError),
+      title: "Database attention needed",
+      message: winesError ?? locationsError,
+      guidance: inferDatabaseGuidance(winesError ?? locationsError)
+    },
     refreshWines,
     refreshLocations,
     refreshAll,

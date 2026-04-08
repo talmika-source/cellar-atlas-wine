@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, Database, FileWarning, ImageIcon, RefreshCw, Wine } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Database, FileWarning, HardDriveDownload, ImageIcon, RefreshCw, Wine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -304,6 +304,54 @@ export function MonitoringPanel() {
                 Image and Vivino coverage helps catch partial imports or broken enrichment early.
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardDescription>Backups and recovery</CardDescription>
+          <CardTitle>Recovery playbook</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Database className="h-4 w-4" />
+                Before risky changes
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                In Neon, create a manual branch or snapshot before schema changes, bulk imports, or major cleanup.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <HardDriveDownload className="h-4 w-4" />
+                External backup
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Export a periodic PostgreSQL dump from Neon for an offline recovery copy if you want protection beyond branch restore.
+              </p>
+            </div>
+            <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <AlertTriangle className="h-4 w-4" />
+                If data disappears
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Check this page first. If Neon is paused or unreachable, fix that before assuming the records were deleted.
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-border/70 bg-background/70 p-5">
+            <p className="text-sm font-medium">Suggested routine</p>
+            <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li>1. Before schema changes or bulk edits: create a Neon branch or snapshot.</li>
+              <li>2. Keep code changes in Git so Vercel deployments can be rolled back safely.</li>
+              <li>3. For extra safety, export a manual PostgreSQL dump on a schedule you are comfortable with.</li>
+              <li>4. If inventory suddenly goes empty, open Monitoring first and confirm the database is reachable.</li>
+            </ol>
           </div>
         </CardContent>
       </Card>
