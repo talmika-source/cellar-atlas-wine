@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 
 const EDITOR_SESSION_COOKIE = "cellar_editor_session";
 const EDITOR_SESSION_MAX_AGE_SECONDS = 60 * 60;
-const EDITOR_USERNAME = process.env.EDITOR_USERNAME?.trim() || "Talmika";
-const EDITOR_PASSWORD = process.env.EDITOR_PASSWORD ?? "Tal2802)";
+const EDITOR_USERNAME = process.env.EDITOR_USERNAME?.trim() ?? "";
+const EDITOR_PASSWORD = process.env.EDITOR_PASSWORD ?? "";
 const EDITOR_SESSION_SECRET =
   process.env.EDITOR_SESSION_SECRET?.trim() || "cellar-atlas-editor-auth-v1";
 
@@ -59,6 +59,10 @@ export function getEditorSession() {
 }
 
 export function isValidEditorCredentials(username: string, password: string) {
+  if (!EDITOR_USERNAME || !EDITOR_PASSWORD) {
+    return false;
+  }
+
   return username === EDITOR_USERNAME && password === EDITOR_PASSWORD;
 }
 
