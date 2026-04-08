@@ -2,7 +2,7 @@
 
 import NextImage from "next/image";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { Camera, Pencil, Plus, RefreshCw, Trash2, Wine } from "lucide-react";
+import { Camera, Eye, Pencil, Plus, RefreshCw, Trash2, Wine } from "lucide-react";
 
 import { KpiCard } from "@/components/cards/kpi-card";
 import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
@@ -23,11 +23,12 @@ import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
 
 const readinessOptions = ["Hold", "Ready", "Peak"] as const;
 const grapeOptions = [
+  "Aglianico",
   "Cabernet Sauvignon",
   "Cabernet Franc",
   "Chardonnay",
-  "Gamay",
   "Chenin Blanc",
+  "Gamay",
   "Grenache",
   "Malbec",
   "Merlot",
@@ -36,6 +37,7 @@ const grapeOptions = [
   "Nebbiolo",
   "Petite Sirah",
   "Pinot Noir",
+  "Primitivo",
   "Riesling",
   "Sangiovese",
   "Sauvignon Blanc",
@@ -46,6 +48,7 @@ const grapeOptions = [
   "Blend",
   "Other"
 ] as const satisfies readonly string[];
+const sortedGrapeOptions = [...grapeOptions].sort((a, b) => a.localeCompare(b));
 const regionOptions = [
   "Aconcagua",
   "Alsace",
@@ -89,6 +92,8 @@ const regionOptions = [
   "Rioja",
   "Sicily",
   "Sonoma",
+  "South Israel",
+  "South Italy",
   "Stellenbosch",
   "Swartland",
   "Tuscany",
@@ -551,8 +556,10 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
   const [locationFilter, setLocationFilter] = useState("all");
   const [readinessFilter, setReadinessFilter] = useState<"all" | WineBottle["readiness"]>("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [scanDialogOpen, setScanDialogOpen] = useState(false);
   const [editingWine, setEditingWine] = useState<WineBottle | null>(null);
+  const [viewingWine, setViewingWine] = useState<WineBottle | null>(null);
   const [form, setForm] = useState<WineFormState>(emptyForm);
   const [scanText, setScanText] = useState("");
   const [scanImageUrl, setScanImageUrl] = useState("");
@@ -798,10 +805,16 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
 
   const openEditDialog = (wine: WineBottle) => {
     setEditingWine(wine);
+    setViewingWine(null);
     setForm(toFormState(wine, locations));
     setError(null);
     setStatusMessage(null);
     setDialogOpen(true);
+  };
+
+  const openViewDialog = (wine: WineBottle) => {
+    setViewingWine(wine);
+    setViewDialogOpen(true);
   };
 
   const submitWine = () => {
@@ -1213,7 +1226,7 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
             <div className="grid gap-3 md:grid-cols-3">
               <NativeSelect value={form.grape} onChange={(event) => updateForm("grape", event.target.value)}>
                 <option value="">Select grape</option>
-                {grapeOptions.map((option) => (
+                {sortedGrapeOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
@@ -1295,6 +1308,90 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
               {editingWine ? "Save Changes" : "Create Wine"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>View Wine</DialogTitle>
+            <DialogDescription>Read-only bottle details from your inventory.</DialogDescription>
+          </DialogHeader>
+          {viewingWine ? (
+            <div className="space-y-5">
+              <div className="flex items-start gap-4">
+                {viewingWine.imageUrl ? (
+                  <div className="relative h-24 w-20 overflow-hidden rounded-2xl border border-border/70 bg-secondary/40">
+                    <NextImage
+                      src={viewingWine.imageUrl}
+                      alt={getWineDisplayTitle(viewingWine)}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : null}
+                <div className="space-y-1">
+                  <h3 className="text-xl font-semibold">{getWineDisplayTitle(viewingWine)}</h3>
+                  <p className="text-sm text-muted-foreground">{viewingWine.producer}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {viewingWine.vivinoScore > 0 ? <Badge variant="info">{viewingWine.vivinoScore.toFixed(1)} Vivino</Badge> : null}
+                    {viewingWine.vivinoScore > 0 && viewingWine.vivinoScoreSource === "Manual" ? <Badge variant="warning">Manual</Badge> : null}
+                    {viewingWine.robertParkerScore > 0 ? <Badge variant="warning">RP {viewingWine.robertParkerScore}</Badge> : null}
+                    {viewingWine.jamesSucklingScore > 0 ? <Badge variant="warning">JS {viewingWine.jamesSucklingScore}</Badge> : null}
+                    {isCellarWine(viewingWine) ? (
+                      <Badge variant={getReadinessVariant(viewingWine.readiness)}>{viewingWine.readiness}</Badge>
+                    ) : (
+                      <Badge variant="info">Drank</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Region</p>
+                  <p className="mt-1 font-medium">{viewingWine.region || "—"}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Country</p>
+                  <p className="mt-1 font-medium">{viewingWine.country || "—"}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Vintage</p>
+                  <p className="mt-1 font-medium">{viewingWine.vintage || "—"}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Quantity</p>
+                  <p className="mt-1 font-medium">{viewingWine.quantity}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Grape</p>
+                  <p className="mt-1 font-medium">{viewingWine.grape || "—"}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Grape Varieties</p>
+                  <p className="mt-1 font-medium">{viewingWine.grapeVarieties || "—"}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Estimated Value</p>
+                  <p className="mt-1 font-medium">{formatCurrency(viewingWine.estimatedValue)}</p>
+                </div>
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Placement</p>
+                  <p className="mt-1 font-medium">{formatWinePlacement(viewingWine.shelf, viewingWine.slot) || "—"}</p>
+                </div>
+              </div>
+
+              {viewingWine.notes ? (
+                <div className="rounded-3xl border border-border/70 bg-background/70 p-4">
+                  <p className="text-sm text-muted-foreground">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap font-medium">{viewingWine.notes}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
 
@@ -1447,6 +1544,10 @@ export function WineInventoryPanel({ query = "", action }: { query?: string; act
                 ) : null}
 
                 <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="outline" onClick={() => openViewDialog(wine)}>
+                    <Eye className="h-4 w-4" />
+                    View Wine
+                  </Button>
                   {isCellarWine(wine) ? (
                     <Button variant="outline" onClick={() => openEditDialog(wine)}>
                       <Pencil className="h-4 w-4" />

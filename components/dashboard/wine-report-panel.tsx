@@ -1,37 +1,80 @@
 "use client";
 
-import { useMemo } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { useDashboardData } from "@/components/dashboard/dashboard-data-provider";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/lib/utils";
-import { isCellarWine } from "@/lib/wine-data";
+import { isCellarWine, type WineBottle } from "@/lib/wine-data";
+
+type SortKey = "producer" | "wineName" | "vintage" | "region" | "country" | "quantity" | "estimatedValue" | "vivinoScore";
+type SortDirection = "asc" | "desc";
+
+function getSortValue(wine: WineBottle, key: SortKey) {
+  switch (key) {
+    case "producer":
+      return wine.producer || "";
+    case "wineName":
+      return wine.wineName || "";
+    case "vintage":
+      return wine.vintage ?? 0;
+    case "region":
+      return wine.region || "";
+    case "country":
+      return wine.country || "";
+    case "quantity":
+      return wine.quantity;
+    case "estimatedValue":
+      return wine.estimatedValue * wine.quantity;
+    case "vivinoScore":
+      return wine.vivinoScore;
+    default:
+      return "";
+  }
+}
 
 export function WineReportPanel() {
   const { wines, winesError } = useDashboardData();
+  const [sortKey, setSortKey] = useState<SortKey>("producer");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const cellarWines = useMemo(() => wines.filter(isCellarWine), [wines]);
 
-  const sortedWines = useMemo(
-    () =>
-      [...cellarWines].sort((left, right) => {
-        const producerCompare = left.producer.localeCompare(right.producer);
+  const sortedWines = useMemo(() => {
+    const next = [...cellarWines];
 
-        if (producerCompare !== 0) {
-          return producerCompare;
-        }
+    next.sort((left, right) => {
+      const leftValue = getSortValue(left, sortKey);
+      const rightValue = getSortValue(right, sortKey);
 
-        const wineNameCompare = left.wineName.localeCompare(right.wineName);
+      let comparison = 0;
 
-        if (wineNameCompare !== 0) {
-          return wineNameCompare;
-        }
+      if (typeof leftValue === "number" && typeof rightValue === "number") {
+        comparison = leftValue - rightValue;
+      } else {
+        comparison = String(leftValue).localeCompare(String(rightValue), undefined, { sensitivity: "base" });
+      }
 
-        return (right.vintage ?? 0) - (left.vintage ?? 0);
-      }),
-    [cellarWines]
-  );
+      if (comparison === 0) {
+        comparison = left.producer.localeCompare(right.producer, undefined, { sensitivity: "base" });
+      }
+
+      if (comparison === 0) {
+        comparison = left.wineName.localeCompare(right.wineName, undefined, { sensitivity: "base" });
+      }
+
+      if (comparison === 0) {
+        comparison = (left.vintage ?? 0) - (right.vintage ?? 0);
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return next;
+  }, [cellarWines, sortDirection, sortKey]);
 
   const totals = useMemo(
     () => ({
@@ -40,6 +83,24 @@ export function WineReportPanel() {
     }),
     [sortedWines]
   );
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+      return;
+    }
+
+    setSortKey(key);
+    setSortDirection(key === "vintage" || key === "quantity" || key === "estimatedValue" || key === "vivinoScore" ? "desc" : "asc");
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) {
+      return <ArrowUpDown className="h-3.5 w-3.5" />;
+    }
+
+    return sortDirection === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />;
+  };
 
   return (
     <div className="space-y-6">
@@ -62,14 +123,14 @@ export function WineReportPanel() {
             <Table>
               <TableHeader className="bg-secondary/50">
                 <TableRow>
-                  <TableHead>Wine producer</TableHead>
-                  <TableHead>Wine name</TableHead>
-                  <TableHead>Vintage</TableHead>
-                  <TableHead>Region</TableHead>
-                  <TableHead>Country</TableHead>
-                  <TableHead className="text-right">Quantity</TableHead>
-                  <TableHead className="text-right">Estimated Value</TableHead>
-                  <TableHead className="text-right">Vivino Score</TableHead>
+                  <TableHead><Button variant="ghost" size="sm" className="-ml-3 h-8 px-3" onClick={() => toggleSort("producer")}>Wine producer {renderSortIcon("producer")}</Button></TableHead>
+                  <TableHead><Button variant="ghost" size="sm" className="-ml-3 h-8 px-3" onClick={() => toggleSort("wineName")}>Wine name {renderSortIcon("wineName")}</Button></TableHead>
+                  <TableHead><Button variant="ghost" size="sm" className="-ml-3 h-8 px-3" onClick={() => toggleSort("vintage")}>Vintage {renderSortIcon("vintage")}</Button></TableHead>
+                  <TableHead><Button variant="ghost" size="sm" className="-ml-3 h-8 px-3" onClick={() => toggleSort("region")}>Region {renderSortIcon("region")}</Button></TableHead>
+                  <TableHead><Button variant="ghost" size="sm" className="-ml-3 h-8 px-3" onClick={() => toggleSort("country")}>Country {renderSortIcon("country")}</Button></TableHead>
+                  <TableHead className="text-right"><Button variant="ghost" size="sm" className="ml-auto h-8 px-3" onClick={() => toggleSort("quantity")}>Quantity {renderSortIcon("quantity")}</Button></TableHead>
+                  <TableHead className="text-right"><Button variant="ghost" size="sm" className="ml-auto h-8 px-3" onClick={() => toggleSort("estimatedValue")}>Estimated Value {renderSortIcon("estimatedValue")}</Button></TableHead>
+                  <TableHead className="text-right"><Button variant="ghost" size="sm" className="ml-auto h-8 px-3" onClick={() => toggleSort("vivinoScore")}>Vivino Score {renderSortIcon("vivinoScore")}</Button></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -43,7 +43,7 @@ export function WineOverview() {
       readyBottles: readyBottleCount,
       peakBottles: peakBottleCount,
       highValueBottles: cellarWines.filter((wine) => wine.estimatedValue >= 100).length,
-      topRated: [...cellarWines].sort((a, b) => (getVivinoPortfolioScore(b) ?? 0) - (getVivinoPortfolioScore(a) ?? 0)).slice(0, 4),
+      topRated: [...cellarWines].sort((a, b) => (getVivinoPortfolioScore(b) ?? 0) - (getVivinoPortfolioScore(a) ?? 0)).slice(0, 8),
       averageScore: scoredWines.length
         ? (scoredWines.reduce((sum, entry) => sum + entry.score, 0) / scoredWines.length).toFixed(2)
         : "0.00",
@@ -58,7 +58,7 @@ export function WineOverview() {
             return accumulator;
           }
 
-          accumulator[country] = (accumulator[country] ?? 0) + 1;
+          accumulator[country] = (accumulator[country] ?? 0) + wine.quantity;
           return accumulator;
         }, {})
       )
@@ -119,7 +119,7 @@ export function WineOverview() {
                     <div key={country} className="flex items-center justify-between gap-3 text-sm">
                       <span className="truncate text-white">{country}</span>
                       <span className="shrink-0 rounded-full bg-teal-400/15 px-2.5 py-1 text-xs font-medium text-teal-100 ring-1 ring-teal-300/20">
-                        {count} {count === 1 ? "wine" : "wines"}
+                        {count} {count === 1 ? "bottle" : "bottles"}
                       </span>
                     </div>
                   ))
