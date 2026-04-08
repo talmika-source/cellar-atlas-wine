@@ -24,8 +24,9 @@ import { type EnrichmentDebugEntry } from "@/lib/critic-sources";
 const readinessOptions = ["Hold", "Ready", "Peak"] as const;
 const grapeOptions = [
   "Aglianico",
-  "Cabernet Sauvignon",
   "Cabernet Franc",
+  "Cabernet Sauvignon",
+  "Carignan",
   "Chardonnay",
   "Chenin Blanc",
   "Gamay",
