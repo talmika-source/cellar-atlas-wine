@@ -36,6 +36,7 @@ Online scoring note:
 - `DATABASE_URL` should point to your Postgres database.
 - `BLOB_READ_WRITE_TOKEN` enables automatic backup snapshots to Vercel Blob.
 - `CRON_SECRET` protects the nightly Vercel cron backup route.
+- `EDITOR_USERNAME`, `EDITOR_PASSWORD`, and `EDITOR_SESSION_SECRET` control the 1-hour edit login gate. Move these into Vercel instead of relying on code defaults.
 - `LWIN_API_URL` + `LWIN_API_KEY` and `OPEN_WINE_DATA_API_URL` + `OPEN_WINE_DATA_API_KEY` can enrich missing metadata like region, country, grape, and style.
 - `APIFY_API_TOKEN` enables Apify-based Vivino score extraction for wines that already have a direct Vivino bottle URL.
 - `APIFY_VIVINO_ACTOR_ID` is optional; when omitted, the app defaults to `mrbridge~vivino-ratings-scraper-from-url-list`.
